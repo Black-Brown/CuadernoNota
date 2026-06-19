@@ -96,4 +96,14 @@ interface PeriodGradeRepositoryInterface
      * @param int $periodId  ID del período académico
      */
     public function reject(int $subjectId, int $periodId): void;
+
+    /**
+     * Devuelve las notas de período de TODOS los estudiantes de una
+     * asignatura en un período determinado.
+     *
+     * Se usa en la pantalla "Notas Final de Periodo" (Track A, solo lectura).
+     *
+     * @return array [['student_id', 'student_name', 'c1_score', 'c2_score', 'c3_score', 'period_score', 'rp_score', 'effective_score', 'status'], ...]
+     */
+    public function findAllBySubjectPeriod(int $subjectId, int $periodId): array;
 }

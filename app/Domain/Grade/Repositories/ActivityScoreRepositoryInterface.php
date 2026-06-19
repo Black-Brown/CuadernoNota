@@ -46,4 +46,13 @@ interface ActivityScoreRepositoryInterface
         int $subjectId,
         int $periodId
     ): array;
+
+    /**
+     * Devuelve TODOS los estudiantes de la sección correspondiente a una
+     * actividad, con sus notas C1, C2 y C3 para esa actividad y período.
+     * Los estudiantes sin nota registrada aparecen con null en cada campo.
+     *
+     * @return array [['student_id', 'student_name', 'c1', 'c2', 'c3'], ...]
+     */
+    public function findStudentScoresByActivity(int $activityId, int $periodId, ?int $sectionId = null): array;
 }
