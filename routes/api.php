@@ -21,6 +21,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:teacher')->prefix('docente')->name('docente.')->group(function () {
         // Grades
         Route::get('/courses', [GradeController::class, 'courses'])->name('courses');
+        Route::get('/grades/summary/{sectionId}/{subjectId}', [GradeController::class, 'gradebookSummary'])->name('grades.summary');
         Route::get('/activities/{subjectId}', [GradeController::class, 'activitiesBySubject'])->name('activities.by-subject');
         Route::get('/grades/activity/{activityId}/{periodId}', [GradeController::class, 'activityGrades'])->name('grades.activity');
         Route::post('/grades/activity-score', [GradeController::class, 'store'])->name('grades.activity-score');

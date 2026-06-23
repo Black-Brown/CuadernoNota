@@ -4,12 +4,14 @@ namespace App\Infrastructure\Http\Controllers\Docente;
 
 use App\Application\Grade\GetActivitiesBySubject;
 use App\Application\Grade\GetActivityGrades;
+use App\Application\Grade\GetGradebookSummary;
 use App\Application\Grade\GetPeriodGrades;
 use App\Application\Grade\GetTeacherCourses;
 use App\Application\Grade\RegisterActivityScore;
 use App\Application\Grade\RegisterRecovery;
 use App\Application\Grade\SubmitGrades;
 use App\Domain\Grade\Repositories\FinalGradeRepositoryInterface;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -22,6 +24,7 @@ class GradeController extends Controller
         private readonly GetTeacherCourses      $getTeacherCourses,
         private readonly GetActivitiesBySubject $getActivitiesBySubject,
         private readonly GetActivityGrades      $getActivityGrades,
+        private readonly GetGradebookSummary    $getGradebookSummary,
         private readonly GetPeriodGrades        $getPeriodGrades,
         private readonly SubmitGrades           $submitGrades,
         private readonly RegisterRecovery       $registerRecovery,
@@ -34,6 +37,22 @@ class GradeController extends Controller
         $courses   = $this->getTeacherCourses->execute($teacherId);
 
         return response()->json(['courses' => $courses]);
+    }
+
+    public function gradebookSummary(Request $request, int $sectionId, int $subjectId): JsonResponse
+    {
+        try {
+            $summary = $this->getGradebookSummary->execute(
+                teacherId: Auth::id() ?? 1,
+                sectionId: $sectionId,
+                subjectId: $subjectId,
+                academicYearId: $request->integer('academic_year_id') ?: null,
+            );
+        } catch (AuthorizationException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
+        }
+
+        return response()->json($summary);
     }
 
     public function activitiesBySubject(int $subjectId): JsonResponse

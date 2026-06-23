@@ -106,4 +106,17 @@ interface PeriodGradeRepositoryInterface
      * @return array [['student_id', 'student_name', 'c1_score', 'c2_score', 'c3_score', 'period_score', 'rp_score', 'effective_score', 'status'], ...]
      */
     public function findAllBySubjectPeriod(int $subjectId, int $periodId): array;
+
+    /**
+     * Devuelve el resumen anual de calificaciones por estudiante para una
+     * sección/asignatura: P1-RP1, P2-RP2, P3-RP3, P4-RP4, PC/CF y estado.
+     *
+     * @return array{course: array, periods: array, students: array, summary: array}
+     */
+    public function findGradebookSummary(
+        int $sectionId,
+        int $subjectId,
+        int $academicYearId,
+        array $course = []
+    ): array;
 }

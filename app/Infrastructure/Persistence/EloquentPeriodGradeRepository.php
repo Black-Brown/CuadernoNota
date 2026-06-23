@@ -4,6 +4,8 @@ namespace App\Infrastructure\Persistence;
 
 use App\Domain\Grade\Entities\PeriodGrade as PeriodGradeEntity;
 use App\Domain\Grade\Repositories\PeriodGradeRepositoryInterface;
+use App\Infrastructure\Models\FinalGrade as FinalGradeModel;
+use App\Infrastructure\Models\Period as PeriodModel;
 use App\Infrastructure\Models\PeriodGrade as PeriodGradeModel;
 use App\Infrastructure\Models\Student as StudentModel;
 
@@ -122,6 +124,142 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
             'effective_score' => $g->rp_score ?? $g->period_score,
             'status'         => $g->status,
         ])->sortBy('student_name')->values()->all();
+    }
+
+    public function findGradebookSummary(
+        int $sectionId,
+        int $subjectId,
+        int $academicYearId,
+        array $course = []
+    ): array {
+        $periods = PeriodModel::where('academic_year_id', $academicYearId)
+            ->orderBy('number')
+            ->get(['id', 'number', 'name', 'months', 'status']);
+
+        $students = StudentModel::where('section_id', $sectionId)
+            ->where('active', true)
+            ->orderBy('last_name')
+            ->orderBy('name')
+            ->get(['id', 'name', 'last_name', 'enrollment_no']);
+
+        $studentIds = $students->pluck('id')->all();
+        $periodIds = $periods->pluck('id')->all();
+
+        $periodGrades = PeriodGradeModel::whereIn('student_id', $studentIds)
+            ->where('subject_id', $subjectId)
+            ->whereIn('period_id', $periodIds)
+            ->get()
+            ->groupBy('student_id')
+            ->map(fn($grades) => $grades->keyBy('period_id'));
+
+        $finalGrades = FinalGradeModel::whereIn('student_id', $studentIds)
+            ->where('subject_id', $subjectId)
+            ->where('academic_year_id', $academicYearId)
+            ->get()
+            ->keyBy('student_id');
+
+        $rows = $students->map(function (StudentModel $student) use ($periods, $periodGrades, $finalGrades) {
+            $gradesByPeriod = $periodGrades->get($student->id, collect());
+            $finalGrade = $finalGrades->get($student->id);
+            $periodPayload = [];
+            $effectiveScores = [];
+            $statuses = [];
+
+            foreach ($periods as $period) {
+                $grade = $gradesByPeriod->get($period->id);
+                $effectiveScore = $grade ? ($grade->rp_score ?? $grade->period_score) : null;
+
+                if ($effectiveScore !== null) {
+                    $effectiveScores[] = (float) $effectiveScore;
+                }
+
+                if ($grade?->status) {
+                    $statuses[] = $grade->status;
+                }
+
+                $periodPayload[] = [
+                    'period_id'       => $period->id,
+                    'period_number'   => $period->number,
+                    'period_name'     => $period->name,
+                    'c1_score'        => $grade?->c1_score,
+                    'c2_score'        => $grade?->c2_score,
+                    'c3_score'        => $grade?->c3_score,
+                    'period_score'    => $grade?->period_score,
+                    'rp_score'        => $grade?->rp_score,
+                    'effective_score' => $effectiveScore,
+                    'status'          => $grade?->status ?? 'pending',
+                ];
+            }
+
+            $calculatedCf = count($effectiveScores) === 4
+                ? (int) round(array_sum($effectiveScores) / 4)
+                : null;
+
+            $cf = $finalGrade?->cf ?? $calculatedCf;
+            $status = $this->resolveGradebookStatus($statuses);
+
+            return [
+                'student_id'       => $student->id,
+                'student_name'     => trim($student->last_name . ', ' . $student->name),
+                'enrollment_no'    => $student->enrollment_no,
+                'periods'          => $periodPayload,
+                'cf'               => $cf,
+                'pc'               => $cf,
+                'final_recovery'   => $finalGrade?->final_recovery,
+                'special_recovery' => $finalGrade?->special_recovery,
+                'status'           => $status,
+                'at_risk'          => $cf !== null && $cf < 70,
+            ];
+        })->values();
+
+        $completedRows = $rows->filter(fn($row) => $row['cf'] !== null);
+        $atRiskRows = $rows->filter(fn($row) => $row['at_risk']);
+
+        return [
+            'course' => [
+                'section_id'       => $sectionId,
+                'subject_id'       => $subjectId,
+                'academic_year_id' => $academicYearId,
+                'grade_name'       => $course['grade_name'] ?? null,
+                'section_name'     => $course['section_name'] ?? null,
+                'subject_name'     => $course['subject_name'] ?? null,
+                'year_label'       => $course['year_label'] ?? null,
+            ],
+            'periods' => $periods->map(fn($period) => [
+                'id'     => $period->id,
+                'number' => $period->number,
+                'name'   => $period->name,
+                'months' => $period->months,
+                'status' => $period->status,
+            ])->values()->all(),
+            'students' => $rows->all(),
+            'summary' => [
+                'total_students' => $rows->count(),
+                'completed'      => $completedRows->count(),
+                'pending'        => $rows->count() - $completedRows->count(),
+                'at_risk'        => $atRiskRows->count(),
+                'class_average'  => $completedRows->count() > 0
+                    ? round($completedRows->avg('cf'), 1)
+                    : null,
+            ],
+        ];
+    }
+
+    private function resolveGradebookStatus(array $statuses): string
+    {
+        if (empty($statuses)) {
+            return 'pending';
+        }
+
+        if (in_array('draft', $statuses, true)) {
+            return 'draft';
+        }
+
+        if (in_array('in_review', $statuses, true)) {
+            return 'in_review';
+        }
+
+        return 'official';
     }
 
     /** Convierte el modelo Eloquent a la entidad de dominio PeriodGrade. */

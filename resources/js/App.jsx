@@ -5,6 +5,7 @@ import DocenteDashboard from './pages/docente/Dashboard';
 import Courses from './pages/docente/Courses';
 import Workspace from './pages/docente/Workspace';
 import ActivityGrades from './pages/docente/ActivityGrades.jsx';
+import Grades from './pages/docente/Grades.jsx';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const queryClient = new QueryClient({
@@ -32,6 +33,8 @@ export default function App() {
                 <Routes>
                   <Route path="dashboard" element={<DocenteDashboard />} />
                   <Route path="courses" element={<Courses />} />
+                  <Route path="grades" element={<Grades />} />
+                  <Route path="grades/:sectionId/:subjectId" element={<Grades />} />
                   <Route path="courses/:sectionId/:subjectId" element={<Workspace />} />
                   <Route path="courses/:sectionId/:subjectId/activity/:activityId" element={<ActivityGrades />} />
                 </Routes>

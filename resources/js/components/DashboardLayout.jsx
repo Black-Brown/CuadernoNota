@@ -27,11 +27,8 @@ export default function DashboardLayout({ children }) {
   const period = periodData?.period;
 
   const menuItems = [
-    { name: 'Dashboard', icon: 'dashboard', path: '/docente/dashboard' },
     { name: 'Mis Cursos', icon: 'school', path: '/docente/courses' },
-    { name: 'Asistencia', icon: 'event_available', path: '/docente/attendance' },
     { name: 'Calificaciones', icon: 'grade', path: '/docente/grades' },
-    { name: 'Observaciones', icon: 'edit_note', path: '/docente/observations' },
   ];
 
   return (
