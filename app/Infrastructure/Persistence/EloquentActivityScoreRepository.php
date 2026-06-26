@@ -18,6 +18,12 @@ class EloquentActivityScoreRepository implements ActivityScoreRepositoryInterfac
      */
     public function save(array $data): void
     {
+        $activity = ActivityModel::findOrFail($data['activity_id']);
+
+        if ($activity->period_id !== null && (int) $activity->period_id !== (int) $data['period_id']) {
+            throw new \InvalidArgumentException('La actividad no pertenece al período seleccionado.');
+        }
+
         ActivityScoreModel::updateOrCreate(
             [
                 'activity_id'   => $data['activity_id'],
@@ -54,6 +60,10 @@ class EloquentActivityScoreRepository implements ActivityScoreRepositoryInterfac
     public function findStudentScoresByActivity(int $activityId, int $periodId, ?int $sectionId = null): array
     {
         $activity = ActivityModel::findOrFail($activityId);
+
+        if ($activity->period_id !== null && (int) $activity->period_id !== (int) $periodId) {
+            return [];
+        }
 
         // Prefer explicit sectionId; fall back to resolving via teacher_section
         if ($sectionId === null) {

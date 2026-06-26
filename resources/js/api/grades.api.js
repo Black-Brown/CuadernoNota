@@ -1,10 +1,17 @@
 import api from './client';
 
-export const getActivitiesBySubject = (subjectId) =>
-  api.get(`/docente/activities/${subjectId}`).then((r) => r.data);
+export const getActivitiesBySubject = (subjectId, sectionId, periodId) =>
+  api.get(`/docente/activities/${subjectId}`, {
+    params: {
+      ...(sectionId ? { section_id: sectionId } : {}),
+      ...(periodId ? { period_id: periodId } : {}),
+    },
+  }).then((r) => r.data);
 
-export const getPeriodGrades = (subjectId, periodId) =>
-  api.get(`/docente/grades/period/${subjectId}/${periodId}`).then((r) => r.data);
+export const getPeriodGrades = (subjectId, periodId, sectionId) =>
+  api.get(`/docente/grades/period/${subjectId}/${periodId}`, {
+    params: sectionId ? { section_id: sectionId } : {},
+  }).then((r) => r.data);
 
 export const getGradebookSummary = (sectionId, subjectId, academicYearId) =>
   api.get(`/docente/grades/summary/${sectionId}/${subjectId}`, {

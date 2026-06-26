@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getCourses } from '../../api/courses.api';
 import { getGradebookSummary } from '../../api/grades.api';
 import DashboardLayout from '../../components/DashboardLayout';
+import { downloadCsv, safeFilename } from '../../utils/exportCsv';
 
 const statusLabels = {
   pending: 'Pendiente',
@@ -26,16 +27,31 @@ function formatScore(value) {
   return Number.isInteger(number) ? String(number) : number.toFixed(1);
 }
 
-function scoreClass(value, emphasis = false) {
-  if (value === null || value === undefined || value === '') {
-    return 'text-slate-300 bg-transparent';
-  }
-
-  const base = emphasis ? 'font-extrabold' : 'font-semibold';
-  return Number(value) < 70
-    ? `${base} text-red-700 bg-red-50`
-    : `${base} text-slate-800 bg-white`;
-}
+const competencies = [
+  {
+    key: 'c1_score',
+    shortLabel: 'C1',
+    label: 'Comunicativa',
+    icon: 'forum',
+    iconTone: 'bg-sky-50 text-sky-700 border-sky-100',
+  },
+  {
+    key: 'c2_score',
+    shortLabel: 'C2',
+    label: 'Pensamiento Logico, Creativo y Critico',
+    secondary: 'Resolucion de Problemas',
+    icon: 'psychology',
+    iconTone: 'bg-violet-50 text-violet-700 border-violet-100',
+  },
+  {
+    key: 'c3_score',
+    shortLabel: 'C3',
+    label: 'Cientifica y Tecnologica',
+    secondary: 'Ambiental y de la Salud',
+    icon: 'science',
+    iconTone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  },
+];
 
 function CourseSelection({ courses, isLoading }) {
   const totalCourses = courses.length;
@@ -137,14 +153,37 @@ function CourseSelection({ courses, isLoading }) {
   );
 }
 
-function GradeCell({ value, emphasis = false }) {
+function ReportCardCell({ value, emphasis = false }) {
+  const hasScore = value !== null && value !== undefined && value !== '';
+  const isLow = hasScore && Number(value) < 70;
+
   return (
-    <td className="p-2 text-center">
-      <div className={`mx-auto w-14 h-9 rounded-lg border border-slate-100 flex items-center justify-center font-mono text-sm ${scoreClass(value, emphasis)}`}>
-        {formatScore(value)}
-      </div>
+    <td className={`border-b border-r border-slate-100 px-1 py-2 text-center align-middle font-mono text-[12px] leading-none ${
+      isLow
+        ? 'bg-rose-50 text-rose-700 font-extrabold'
+        : hasScore
+          ? emphasis
+            ? 'bg-slate-900 text-white font-extrabold'
+            : 'bg-white text-slate-800 font-bold'
+          : emphasis
+            ? 'bg-slate-50 text-slate-300'
+            : 'bg-slate-50/60 text-slate-300'
+    }`}>
+      {formatScore(value) === '-' ? '' : formatScore(value)}
     </td>
   );
+}
+
+function competencyAverage(periods, scoreKey) {
+  const values = periods
+    .map((period) => period?.[scoreKey])
+    .filter((value) => value !== null && value !== undefined && value !== '')
+    .map(Number)
+    .filter((value) => !Number.isNaN(value));
+
+  return values.length === 4
+    ? Math.round(values.reduce((total, value) => total + value, 0) / values.length)
+    : null;
 }
 
 function GradebookView({ course }) {
@@ -158,6 +197,54 @@ function GradebookView({ course }) {
   const students = data?.students || [];
   const summary = data?.summary || {};
   const courseData = data?.course || course;
+  const handleExport = () => {
+    if (!courseData || students.length === 0) return;
+
+    const headers = [
+      'Estudiante',
+      'Matricula',
+      ...competencies.flatMap((competency) => (
+        [1, 2, 3, 4].flatMap((number) => [
+          `${competency.shortLabel} P${number}`,
+          `${competency.shortLabel} RP${number}`,
+        ])
+      )),
+      'Final C1',
+      'Final C2',
+      'Final C3',
+      'Estado',
+    ];
+
+    const rows = [
+      [`Calificaciones - ${courseData.grade_name} ${courseData.section_name} - ${courseData.subject_name}`],
+      ['Periodo', courseData.year_label || 'Año escolar activo'],
+      [],
+      headers,
+      ...students.map((student) => {
+        const periodsByNumber = new Map(student.periods.map((period) => [period.period_number, period]));
+        const orderedPeriods = [1, 2, 3, 4].map((number) => periodsByNumber.get(number) || {});
+        const finalCompetencies = competencies.map((competency) => competencyAverage(orderedPeriods, competency.key));
+
+        return [
+          student.student_name,
+          student.enrollment_no || `ID ${student.student_id}`,
+          ...competencies.flatMap((competency) => (
+            orderedPeriods.flatMap((period) => [
+              formatScore(period[competency.key]),
+              formatScore(period.rp_score),
+            ])
+          )),
+          ...finalCompetencies.map(formatScore),
+          statusLabels[student.status] || student.status,
+        ];
+      }),
+    ];
+
+    downloadCsv(
+      `calificaciones-${safeFilename(`${courseData.grade_name}-${courseData.section_name}-${courseData.subject_name}`)}.csv`,
+      rows
+    );
+  };
 
   return (
     <>
@@ -188,6 +275,8 @@ function GradebookView({ course }) {
             </Link>
             <button
               type="button"
+              onClick={handleExport}
+              disabled={students.length === 0 || isLoading}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">ios_share</span>
@@ -217,10 +306,24 @@ function GradebookView({ course }) {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
+        <div className="px-5 py-4 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
           <div>
-            <h2 className="text-base font-extrabold text-slate-800">Resumen anual de notas</h2>
-            <p className="text-xs text-slate-400">P = período, RP = recuperación pedagógica, PC = promedio final calculado.</p>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[20px] text-indigo-500">view_week</span>
+              <h2 className="text-base font-extrabold text-slate-800">Resumen anual de notas</h2>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">P = período, RP = recuperación pedagógica, C1/C2/C3 = calificación final por competencia.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {competencies.map((competency) => (
+              <span
+                key={competency.key}
+                className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider ${competency.iconTone}`}
+              >
+                <span className="material-symbols-outlined text-[14px]">{competency.icon}</span>
+                {competency.shortLabel}
+              </span>
+            ))}
           </div>
           {isLoading && (
             <span className="flex items-center gap-2 text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
@@ -241,25 +344,74 @@ function GradebookView({ course }) {
             <p className="text-sm font-semibold mt-2">Preparando tabla de calificaciones...</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1060px] text-left border-collapse">
+          <div className="bg-slate-50/70 p-3">
+            <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+            <table className="w-full min-w-[1320px] table-fixed border-separate border-spacing-0 text-left">
+              <colgroup>
+                <col className="w-64" />
+                {competencies.map((competency) => (
+                  <React.Fragment key={competency.key}>
+                    {[1, 2, 3, 4].map((number) => (
+                      <React.Fragment key={`${competency.key}-${number}`}>
+                        <col className="w-10" />
+                        <col className="w-10" />
+                      </React.Fragment>
+                    ))}
+                  </React.Fragment>
+                ))}
+                <col className="w-12" />
+                <col className="w-12" />
+                <col className="w-12" />
+                <col className="w-28" />
+              </colgroup>
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  <th className="sticky left-0 z-20 bg-slate-50 py-4 px-5 min-w-64">Estudiante</th>
-                  {[1, 2, 3, 4].map((number) => (
-                    <React.Fragment key={number}>
-                      <th className="py-4 px-2 text-center">P{number}</th>
-                      <th className="py-4 px-2 text-center">RP{number}</th>
+                <tr className="text-[11px] font-bold text-slate-900">
+                  <th rowSpan="2" className="sticky left-0 z-30 border-b border-r border-slate-200 bg-white px-3 py-3 align-middle shadow-[8px_0_14px_-18px_rgba(15,23,42,0.6)]">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Estudiante</span>
+                  </th>
+                  {competencies.map((competency) => (
+                    <th key={competency.key} colSpan="8" className="border-b border-r border-slate-200 bg-white px-3 py-3 align-top">
+                      <div className="flex items-start gap-2">
+                        <span className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border ${competency.iconTone}`}>
+                          <span className="material-symbols-outlined text-[18px]">{competency.icon}</span>
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-extrabold text-slate-400">{competency.shortLabel}</span>
+                            <p className="leading-tight text-slate-900">{competency.label}</p>
+                          </div>
+                          {competency.secondary && <p className="mt-0.5 leading-tight text-slate-500">{competency.secondary}</p>}
+                        </div>
+                      </div>
+                    </th>
+                  ))}
+                  <th colSpan="3" className="border-b border-r border-slate-200 bg-slate-100 px-3 py-3 text-center text-[10px] leading-tight text-slate-700">
+                    Calificacion final por competencia
+                  </th>
+                  <th rowSpan="2" className="border-b border-slate-200 bg-white px-2 py-3 text-center">
+                    Estado
+                  </th>
+                </tr>
+                <tr className="bg-slate-50 text-[12px] font-extrabold text-slate-600">
+                  {competencies.map((competency) => (
+                    <React.Fragment key={`${competency.key}-periods`}>
+                      {[1, 2, 3, 4].map((number) => (
+                        <React.Fragment key={`${competency.key}-period-${number}`}>
+                          <th className="border-b border-r border-slate-200 px-1 py-2 text-center">P{number}</th>
+                          <th className="border-b border-r border-slate-200 bg-white px-1 py-2 text-center text-slate-400">RP</th>
+                        </React.Fragment>
+                      ))}
                     </React.Fragment>
                   ))}
-                  <th className="py-4 px-2 text-center bg-slate-100">PC</th>
-                  <th className="py-4 px-5 text-center">Estado</th>
+                  <th className="border-b border-r border-slate-200 bg-slate-100 px-1 py-2 text-center text-slate-700">C1</th>
+                  <th className="border-b border-r border-slate-200 bg-slate-100 px-1 py-2 text-center text-slate-700">C2</th>
+                  <th className="border-b border-r border-slate-200 bg-slate-100 px-1 py-2 text-center text-slate-700">C3</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
+              <tbody className="text-sm">
                 {students.length === 0 ? (
                   <tr>
-                    <td colSpan="11" className="py-16 text-center text-slate-400">
+                    <td colSpan="29" className="py-16 text-center text-slate-400">
                       <span className="material-symbols-outlined text-[40px]">table_rows_narrow</span>
                       <p className="text-sm font-semibold mt-2">No hay calificaciones calculadas para este curso.</p>
                     </td>
@@ -267,36 +419,34 @@ function GradebookView({ course }) {
                 ) : (
                   students.map((student) => {
                     const periodsByNumber = new Map(student.periods.map((period) => [period.period_number, period]));
+                    const orderedPeriods = [1, 2, 3, 4].map((number) => periodsByNumber.get(number) || {});
+                    const finalCompetencies = competencies.map((competency) => competencyAverage(orderedPeriods, competency.key));
 
                     return (
-                      <tr key={student.student_id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 py-3 px-5">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-extrabold ${
-                              student.at_risk ? 'bg-red-50 text-red-700' : 'bg-indigo-50 text-indigo-700'
-                            }`}>
-                              {student.student_name.slice(0, 2).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-slate-800 truncate">{student.student_name}</p>
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                {student.enrollment_no || `ID ${student.student_id}`}
-                              </p>
-                            </div>
+                      <tr key={student.student_id} className="group hover:bg-slate-50">
+                        <td className="sticky left-0 z-20 border-b border-r border-slate-100 bg-white px-3 py-2 shadow-[8px_0_14px_-18px_rgba(15,23,42,0.6)] group-hover:bg-slate-50">
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-bold text-slate-900">{student.student_name}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                              {student.enrollment_no || `ID ${student.student_id}`}
+                            </p>
                           </div>
                         </td>
-                        {[1, 2, 3, 4].map((number) => {
-                          const period = periodsByNumber.get(number) || {};
-                          return (
-                            <React.Fragment key={number}>
-                              <GradeCell value={period.effective_score} />
-                              <GradeCell value={period.rp_score} />
-                            </React.Fragment>
-                          );
-                        })}
-                        <GradeCell value={student.pc} emphasis />
-                        <td className="py-3 px-5 text-center">
-                          <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-lg border text-[10px] font-extrabold uppercase tracking-wider ${
+                        {competencies.map((competency) => (
+                          <React.Fragment key={`${student.student_id}-${competency.key}`}>
+                            {orderedPeriods.map((period, index) => (
+                              <React.Fragment key={`${competency.key}-${index + 1}`}>
+                                <ReportCardCell value={period[competency.key]} />
+                                <ReportCardCell value={period.rp_score} />
+                              </React.Fragment>
+                            ))}
+                          </React.Fragment>
+                        ))}
+                        {finalCompetencies.map((score, index) => (
+                          <ReportCardCell key={`final-${index + 1}`} value={score} emphasis />
+                        ))}
+                        <td className="border-b border-slate-100 bg-white px-2 py-2 text-center group-hover:bg-slate-50">
+                          <span className={`inline-flex items-center justify-center rounded border px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider ${
                             statusStyles[student.status] || statusStyles.pending
                           }`}>
                             {statusLabels[student.status] || student.status}
@@ -308,6 +458,7 @@ function GradebookView({ course }) {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>

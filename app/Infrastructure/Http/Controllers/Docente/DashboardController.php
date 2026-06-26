@@ -77,7 +77,15 @@ class DashboardController extends Controller
         $periods = DB::table('periods')
             ->join('academic_years', 'periods.academic_year_id', '=', 'academic_years.id')
             ->where('academic_years.active', true)
-            ->select('periods.id', 'periods.name', 'periods.number', 'periods.status')
+            ->select(
+                'periods.id',
+                'periods.name',
+                'periods.number',
+                'periods.months',
+                'periods.status',
+                'periods.start_date',
+                'periods.end_date'
+            )
             ->orderBy('periods.number')
             ->get();
 

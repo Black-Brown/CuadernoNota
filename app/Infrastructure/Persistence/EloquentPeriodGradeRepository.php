@@ -70,10 +70,11 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
     }
 
     /** Cambia estado de todas las notas de una asignatura/período a 'in_review'. */
-    public function submitForReview(int $subjectId, int $periodId): void
+    public function submitForReview(int $subjectId, int $periodId, ?int $sectionId = null): void
     {
         PeriodGradeModel::where('subject_id', $subjectId)
             ->where('period_id', $periodId)
+            ->when($sectionId, fn($query) => $query->whereHas('student', fn($studentQuery) => $studentQuery->where('section_id', $sectionId)))
             ->where('status', 'draft')
             ->update(['status' => 'in_review']);
     }
@@ -104,10 +105,11 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
             ]);
     }
 
-    public function findAllBySubjectPeriod(int $subjectId, int $periodId): array
+    public function findAllBySubjectPeriod(int $subjectId, int $periodId, ?int $sectionId = null): array
     {
         $grades = PeriodGradeModel::where('subject_id', $subjectId)
             ->where('period_id', $periodId)
+            ->when($sectionId, fn($query) => $query->whereHas('student', fn($studentQuery) => $studentQuery->where('section_id', $sectionId)))
             ->with('student:id,name,last_name')
             ->get();
 

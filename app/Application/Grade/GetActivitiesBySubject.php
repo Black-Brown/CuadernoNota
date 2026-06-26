@@ -12,8 +12,8 @@ class GetActivitiesBySubject
         private readonly ActivityRepositoryInterface $activityRepo,
     ) {}
 
-    public function execute(int $subjectId): array
+    public function execute(int $subjectId, ?int $sectionId = null, ?int $periodId = null): array
     {
-        return $this->activityRepo->findBySubjectWithScoreCount($subjectId);
+        return $this->activityRepo->findBySubjectWithScoreCount($subjectId, $sectionId, $periodId);
     }
 }

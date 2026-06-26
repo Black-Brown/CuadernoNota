@@ -6,6 +6,7 @@ use App\Infrastructure\Http\Controllers\Docente\AttendanceController;
 use App\Infrastructure\Http\Controllers\Docente\DashboardController;
 use App\Infrastructure\Http\Controllers\Docente\GradeController;
 use App\Infrastructure\Http\Controllers\Docente\ObservationController;
+use App\Infrastructure\Http\Controllers\Docente\RiskController;
 use Illuminate\Support\Facades\Route;
 
 // ── Rutas públicas ────────────────────────────────────────────────────────────
@@ -39,13 +40,22 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/activities/{id}', [ActivityController::class, 'update'])->name('activities.update');
 
         // Observations
+        Route::get('/observations/course/{sectionId}/{subjectId}', [ObservationController::class, 'course'])->name('observations.course');
+        Route::get('/observations/course/{sectionId}/{subjectId}/students/{studentId}', [ObservationController::class, 'student'])->name('observations.student-workspace');
         Route::get('/observations/{studentId}', [ObservationController::class, 'index'])->name('observations.index');
         Route::post('/observations', [ObservationController::class, 'store'])->name('observations.store');
+        Route::patch('/observations/{id}', [ObservationController::class, 'update'])->name('observations.update');
+        Route::delete('/observations/{id}', [ObservationController::class, 'destroy'])->name('observations.destroy');
 
         // Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
         Route::get('/dashboard/{sectionId}/{subjectId}', [DashboardController::class, 'bySubject'])->name('dashboard.by-subject');
         Route::get('/current-period', [DashboardController::class, 'currentPeriod'])->name('current-period');
         Route::get('/periods',        [DashboardController::class, 'periods'])->name('periods');
+
+        // Students at Risk
+        Route::get('/risk', [RiskController::class, 'index'])->name('risk.index');
+        Route::get('/risk/{sectionId}/{subjectId}', [RiskController::class, 'course'])->name('risk.course');
+        Route::get('/risk/{sectionId}/{subjectId}/students/{studentId}', [RiskController::class, 'student'])->name('risk.student');
     });
 });

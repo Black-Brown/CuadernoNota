@@ -72,7 +72,7 @@ interface PeriodGradeRepositoryInterface
      * @param int $subjectId ID de la asignatura
      * @param int $periodId  ID del período académico
      */
-    public function submitForReview(int $subjectId, int $periodId): void;
+    public function submitForReview(int $subjectId, int $periodId, ?int $sectionId = null): void;
 
     /**
      * Aprueba las notas de período, cambiando su estado a 'official'
@@ -105,7 +105,7 @@ interface PeriodGradeRepositoryInterface
      *
      * @return array [['student_id', 'student_name', 'c1_score', 'c2_score', 'c3_score', 'period_score', 'rp_score', 'effective_score', 'status'], ...]
      */
-    public function findAllBySubjectPeriod(int $subjectId, int $periodId): array;
+    public function findAllBySubjectPeriod(int $subjectId, int $periodId, ?int $sectionId = null): array;
 
     /**
      * Devuelve el resumen anual de calificaciones por estudiante para una

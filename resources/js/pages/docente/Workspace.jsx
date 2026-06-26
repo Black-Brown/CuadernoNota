@@ -1,16 +1,19 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCourses } from '../../api/courses.api';
 import { getSubjectDashboard } from '../../api/dashboard.api';
-import { getPeriodGrades, getActivitiesBySubject } from '../../api/grades.api';
+import { getPeriodGrades, getActivitiesBySubject, submitGrades } from '../../api/grades.api';
 import { getCurrentPeriod } from '../../api/periods.api';
 import DashboardLayout from '../../components/DashboardLayout';
 import ManageActivitiesModal from '../../components/ManageActivitiesModal';
+import usePeriodStore from '../../store/periodStore';
+import { downloadCsv, safeFilename } from '../../utils/exportCsv';
 
 export default function Workspace() {
   const { sectionId, subjectId } = useParams();
   const queryClient = useQueryClient();
+  const selectedPeriod = usePeriodStore((state) => state.selectedPeriod);
 
   const [showGradesTable, setShowGradesTable] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -59,12 +62,40 @@ export default function Workspace() {
     refetchOnWindowFocus: false,
   });
 
-  const period = periodData?.period;
+  const period = selectedPeriod || periodData?.period;
+  const isPeriodOpen = period?.status === 'open';
+
+  const { data: periodLockData } = useQuery({
+    queryKey: ['periodGradesLock', subjectId, period?.id, sectionId],
+    queryFn: () => getPeriodGrades(subjectId, period.id, sectionId),
+    enabled: !!subjectId && !!period?.id && !!sectionId,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const lockedGradeStatus = periodLockData?.grades?.find((grade) =>
+    ['in_review', 'official'].includes(grade.status)
+  )?.status;
+  const canEditWorkspace = isPeriodOpen && !lockedGradeStatus;
+  const hasCalculatedGrades = (periodLockData?.grades || []).length > 0;
+
+  const submitGradesMutation = useMutation({
+    mutationFn: submitGrades,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['periodGradesLock', subjectId, period?.id, sectionId] });
+      queryClient.invalidateQueries({ queryKey: ['periodGrades', subjectId, period?.id, sectionId] });
+      queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, period?.id] });
+      showToast('Calificaciones enviadas a revisión correctamente.');
+    },
+    onError: (error) => {
+      showToast(error?.response?.data?.message || 'No se pudieron enviar las calificaciones a revisión.');
+    },
+  });
 
   const { data: activitiesData, isLoading: isLoadingActivities } = useQuery({
-    queryKey: ['activitiesBySubject', subjectId],
-    queryFn: () => getActivitiesBySubject(subjectId),
-    enabled: !!subjectId,
+    queryKey: ['activitiesBySubject', subjectId, sectionId, period?.id],
+    queryFn: () => getActivitiesBySubject(subjectId, sectionId, period.id),
+    enabled: !!subjectId && !!sectionId && !!period?.id,
     staleTime: 3 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
@@ -78,9 +109,9 @@ export default function Workspace() {
     isError: isGradesError,
     error: gradesError,
   } = useQuery({
-    queryKey: ['periodGrades', subjectId, period?.id],
-    queryFn: () => getPeriodGrades(subjectId, period.id),
-    enabled: showGradesTable && !!subjectId && !!period?.id,
+    queryKey: ['periodGrades', subjectId, period?.id, sectionId],
+    queryFn: () => getPeriodGrades(subjectId, period.id, sectionId),
+    enabled: showGradesTable && !!subjectId && !!period?.id && !!sectionId,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 1,
@@ -90,11 +121,11 @@ export default function Workspace() {
     if (!subjectId || !period?.id) return;
 
     queryClient.prefetchQuery({
-      queryKey: ['periodGrades', subjectId, period.id],
-      queryFn: () => getPeriodGrades(subjectId, period.id),
+      queryKey: ['periodGrades', subjectId, period.id, sectionId],
+      queryFn: () => getPeriodGrades(subjectId, period.id, sectionId),
       staleTime: 5 * 60 * 1000,
     });
-  }, [queryClient, subjectId, period?.id]);
+  }, [queryClient, subjectId, period?.id, sectionId]);
 
   const activityMeta = {
     Proyectos: {
@@ -162,6 +193,50 @@ export default function Workspace() {
     }
   };
 
+  const handleExportReport = () => {
+    const baseName = safeFilename(`${gradeName}-${sectionName}-${subjectName}-${period?.name || 'periodo'}`);
+
+    if (studentsList.length > 0) {
+      downloadCsv(`reporte-workspace-${baseName}.csv`, [
+        [`Reporte Workspace - ${subjectName}`],
+        ['Curso', `${gradeName} ${sectionName}`],
+        ['Periodo', period?.name || ''],
+        [],
+        ['Estudiante', 'C1', 'C2', 'C3', 'Nota periodo', 'RP', 'Nota final', 'Estado'],
+        ...studentsList.map((student) => [
+          student.student_name,
+          student.c1_score ?? '',
+          student.c2_score ?? '',
+          student.c3_score ?? '',
+          student.period_score ?? '',
+          student.rp_score ?? '',
+          student.effective_score ?? '',
+          student.status ?? '',
+        ]),
+      ]);
+      return;
+    }
+
+    downloadCsv(`reporte-workspace-${baseName}.csv`, [
+      [`Reporte Workspace - ${subjectName}`],
+      ['Curso', `${gradeName} ${sectionName}`],
+      ['Periodo', period?.name || ''],
+      ['Promedio general', groupAvg],
+      ['Riesgo academico', atRiskCount],
+      ['Asistencia', `${attendancePct}%`],
+      [],
+      ['Actividades'],
+      ['Nombre', 'Tipo', 'Estado', 'Notas registradas', 'Descripcion'],
+      ...realActivities.map((activity) => [
+        activity.name,
+        activity.type || '',
+        activity.active ? 'Activa' : 'Inactiva',
+        activity.score_count ?? 0,
+        activity.description || '',
+      ]),
+    ]);
+  };
+
   const renderGradesContent = () => {
     if (isLoadingGrades || isLoadingPeriod) {
       return (
@@ -203,7 +278,7 @@ export default function Workspace() {
               type="button"
               onClick={() =>
                 queryClient.invalidateQueries({
-                  queryKey: ['periodGrades', subjectId, period?.id],
+                  queryKey: ['periodGrades', subjectId, period?.id, sectionId],
                 })
               }
               className="mt-2 px-4 py-2 bg-slate-950 text-white rounded-xl text-xs font-bold hover:bg-slate-900 transition-all"
@@ -397,6 +472,31 @@ export default function Workspace() {
 
               <button
                 type="button"
+                onClick={() => submitGradesMutation.mutate({
+                  subject_id: Number(subjectId),
+                  section_id: Number(sectionId),
+                  period_id: period.id,
+                })}
+                disabled={!canEditWorkspace || !period?.id || !hasCalculatedGrades || submitGradesMutation.isPending}
+                title={
+                  !hasCalculatedGrades
+                    ? 'No hay notas calculadas para enviar'
+                    : !canEditWorkspace
+                      ? 'Este workspace no permite modificaciones'
+                      : 'Enviar calificaciones a revisión'
+                }
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-semibold text-slate-700 transition-all shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span className={`material-symbols-outlined text-[18px] ${submitGradesMutation.isPending ? 'animate-spin' : ''}`}>
+                  {submitGradesMutation.isPending ? 'sync' : 'task_alt'}
+                </span>
+
+                Enviar a revisión
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportReport}
                 className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-xs font-semibold text-slate-700 transition-all shadow-sm"
               >
                 <span className="material-symbols-outlined text-[18px]">
@@ -431,7 +531,7 @@ export default function Workspace() {
               </span>
 
               <h2 className="text-base font-bold">
-                Periodo Actual: {period ? period.name : '—'}
+                Periodo seleccionado: {period ? period.name : '—'}
               </h2>
             </div>
 
@@ -497,8 +597,10 @@ export default function Workspace() {
 
               <button
                 type="button"
-                onClick={() => setShowActivitiesModal(true)}
-                className="text-[10px] font-bold text-slate-400 hover:text-slate-800 transition-colors uppercase tracking-wider flex items-center gap-1"
+                onClick={() => canEditWorkspace && setShowActivitiesModal(true)}
+                disabled={!canEditWorkspace}
+                title={!canEditWorkspace ? 'Este workspace no permite modificaciones' : 'Gestionar actividades'}
+                className="text-[10px] font-bold text-slate-400 hover:text-slate-800 transition-colors uppercase tracking-wider flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 GESTIONAR ACTIVIDADES
 
@@ -595,8 +697,9 @@ export default function Workspace() {
 
                 <button
                   type="button"
-                  onClick={() => setShowActivitiesModal(true)}
-                  className="group border-2 border-dashed border-slate-200 hover:border-slate-800 hover:bg-slate-50 p-5 rounded-xl transition-all flex flex-col items-center justify-center gap-3 min-h-[160px]"
+                  onClick={() => canEditWorkspace && setShowActivitiesModal(true)}
+                  disabled={!canEditWorkspace}
+                  className="group border-2 border-dashed border-slate-200 hover:border-slate-800 hover:bg-slate-50 p-5 rounded-xl transition-all flex flex-col items-center justify-center gap-3 min-h-[160px] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:bg-transparent"
                 >
                   <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-slate-900 group-hover:text-white transition-all">
                     <span className="material-symbols-outlined text-base">
@@ -874,10 +977,14 @@ export default function Workspace() {
       {showActivitiesModal && (
         <ManageActivitiesModal
           subjectId={subjectId}
+          sectionId={sectionId}
+          periodId={period?.id}
+          periodName={period?.name}
+          periodStatus={period?.status}
+          lockedGradeStatus={lockedGradeStatus}
           onClose={() => setShowActivitiesModal(false)}
         />
       )}
     </>
   );
 }
-

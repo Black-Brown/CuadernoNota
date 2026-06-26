@@ -12,7 +12,7 @@ interface ActivityRepositoryInterface
      *
      * @return array [['id', 'name', 'is_base', 'active', 'score_count'], ...]
      */
-    public function findBySubjectWithScoreCount(int $subjectId): array;
+    public function findBySubjectWithScoreCount(int $subjectId, ?int $sectionId = null, ?int $periodId = null): array;
 
     /**
      * Crea una nueva actividad adicional (is_base = false).
