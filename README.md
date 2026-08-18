@@ -1,58 +1,272 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Cuaderno Nota
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Cuaderno Nota es una aplicación web de gestión académica diseñada para facilitar el trabajo diario de los docentes. Permite administrar cursos, actividades, calificaciones, asistencia, observaciones y alertas de riesgo estudiantil desde un mismo espacio.
 
-## About Laravel
+El sistema organiza la información por año escolar, grado, sección, asignatura y período académico. Cada docente solo puede consultar o modificar los cursos que tiene asignados.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Funcionalidades principales
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- Autenticación mediante tokens con Laravel Sanctum.
+- Panel general del docente con indicadores académicos.
+- Consulta de cursos, secciones y asignaturas asignadas.
+- Gestión de actividades por curso y período.
+- Registro de calificaciones por estudiante, actividad y competencia.
+- Cálculo automático de competencias y notas por período.
+- Libro de calificaciones con los cuatro períodos y calificación final.
+- Envío de calificaciones a revisión y bloqueo de espacios cerrados.
+- Registro de recuperación pedagógica, final y especial.
+- Registro de asistencia y justificación de ausencias.
+- Observaciones académicas, disciplinarias e incidentes.
+- Identificación de estudiantes con riesgo académico o de asistencia.
+- Exportación de información académica en formato CSV.
+- Control de acceso según el docente, la sección y el año académico.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Reglas de calificación
 
-## Learning Laravel
+Las actividades se registran bajo una de las tres competencias del sistema:
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- C1: Competencia comunicativa.
+- C2: Pensamiento lógico, creativo y crítico.
+- C3: Competencia científica y tecnológica.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Solo se incluyen en el promedio las actividades que tengan una nota registrada.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```text
+Competencia = promedio de sus actividades calificadas
+Nota del período = (C1 + C2 + C3) / 3
+Calificación final = promedio de las notas efectivas de los 4 períodos
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Cuando existe una recuperación pedagógica, esta sustituye la nota ordinaria del período para calcular la calificación final.
 
-## Contributing
+## Tecnologías
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Backend
 
-## Code of Conduct
+- PHP 8.3
+- Laravel 13
+- Laravel Sanctum
+- Eloquent ORM
+- PHPUnit 12
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Frontend
 
-## Security Vulnerabilities
+- React 19
+- React Router 7
+- TanStack React Query 5
+- Zustand 5
+- Tailwind CSS 4
+- Vite 8
+- Axios
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### Base de datos
 
-## License
+Laravel permite utilizar SQLite, MySQL, MariaDB o PostgreSQL. La configuración predeterminada del proyecto utiliza SQLite.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Arquitectura
+
+El backend separa las reglas de negocio de los detalles de Laravel siguiendo una estructura inspirada en Domain-Driven Design y arquitectura limpia:
+
+```text
+app/
+├── Domain/          Entidades, reglas de negocio y contratos
+├── Application/     Casos de uso del sistema
+└── Infrastructure/  Controladores, modelos Eloquent y repositorios
+
+resources/js/
+├── api/             Cliente y funciones de acceso a la API
+├── components/      Componentes reutilizables
+├── pages/           Pantallas de autenticación y del docente
+├── store/           Estado global con Zustand
+└── utils/           Utilidades del frontend
+```
+
+El recorrido habitual de una solicitud es:
+
+```text
+React → API Laravel → Controller → Caso de uso → Repositorio → Base de datos
+                                      ↓
+                              Servicio de dominio
+```
+
+## Requisitos
+
+- PHP 8.3 o superior con las extensiones habituales de Laravel.
+- Composer 2.
+- Node.js 20 o superior y npm.
+- Git.
+- SQLite, MySQL, MariaDB o PostgreSQL.
+
+En Windows se puede utilizar Laragon para instalar PHP, Composer y MySQL de manera sencilla.
+
+## Instalación
+
+### 1. Clonar el repositorio
+
+```bash
+git clone https://github.com/Black-Brown/CuadernoNota.git
+cd CuadernoNota
+```
+
+### 2. Instalar las dependencias
+
+```bash
+composer install
+npm install
+```
+
+### 3. Configurar el entorno
+
+Crea un archivo `.env` en la raíz. Para utilizar SQLite puedes comenzar con esta configuración mínima:
+
+```env
+APP_NAME="Cuaderno Nota"
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_URL=http://localhost:8000
+
+DB_CONNECTION=sqlite
+```
+
+Crea el archivo de base de datos y genera la clave de la aplicación:
+
+```bash
+php -r "file_exists('database/database.sqlite') || touch('database/database.sqlite');"
+php artisan key:generate
+```
+
+En Windows también puedes crear manualmente el archivo vacío `database/database.sqlite`.
+
+### 4. Ejecutar migraciones y datos de prueba
+
+```bash
+php artisan migrate
+php artisan db:seed
+```
+
+El seeder principal carga competencias, cursos, estudiantes y otros datos demostrativos. Si solo quieres el conjunto mínimo de demostración, ejecuta:
+
+```bash
+php artisan db:seed --class=DemoSeeder
+```
+
+### 5. Iniciar el entorno de desarrollo
+
+```bash
+composer run dev
+```
+
+También puedes iniciar cada servidor por separado:
+
+```bash
+php artisan serve
+npm run dev
+```
+
+La aplicación estará disponible normalmente en [http://localhost:8000](http://localhost:8000).
+
+## Configuración con MySQL
+
+Crea una base de datos llamada `cuaderno_nota` y utiliza una configuración similar:
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=cuaderno_nota
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+Después ejecuta:
+
+```bash
+php artisan migrate --seed
+```
+
+## Usuario de demostración
+
+Después de ejecutar `DemoSeeder` puedes iniciar sesión con:
+
+```text
+Correo: docente@demo.com
+Contraseña: password
+```
+
+Estas credenciales son exclusivamente para desarrollo. Deben cambiarse o eliminarse antes de publicar el sistema.
+
+## Comandos útiles
+
+```bash
+# Iniciar backend, frontend, cola y visor de logs
+composer run dev
+
+# Ejecutar pruebas
+composer test
+
+# Aplicar el formato de Laravel
+./vendor/bin/pint
+
+# Compilar el frontend para producción
+npm run build
+
+# Limpiar las cachés de Laravel
+php artisan optimize:clear
+
+# Reconstruir la base de datos con datos de prueba
+php artisan migrate:fresh --seed
+```
+
+El último comando elimina todos los datos existentes. Úsalo únicamente en un entorno de desarrollo.
+
+## API y seguridad
+
+Las rutas de la API se encuentran bajo `/api`. Las operaciones del módulo docente requieren:
+
+- Un token válido de Laravel Sanctum.
+- Una cuenta activa con el rol `teacher`.
+- Una asignación válida al curso, sección y año académico solicitado.
+
+El backend valida estas condiciones aunque la interfaz o una solicitud externa intente enviar identificadores de otro curso.
+
+## Pruebas
+
+Las pruebas cubren reglas importantes del dominio:
+
+- Cálculo de competencias.
+- Cálculo de notas por período.
+- Cálculo de la calificación final.
+- Alertas por ausencias consecutivas.
+- Porcentaje mínimo de asistencia anual.
+
+Para ejecutarlas:
+
+```bash
+composer test
+```
+
+## Preparación para producción
+
+Antes de publicar el sistema:
+
+1. Configura `APP_ENV=production` y `APP_DEBUG=false`.
+2. Utiliza credenciales de base de datos seguras.
+3. Elimina o cambia los usuarios y contraseñas de demostración.
+4. Configura correo, colas, logs y copias de seguridad.
+5. Ejecuta las migraciones y compila el frontend.
+
+```bash
+php artisan migrate --force
+npm ci
+npm run build
+php artisan optimize
+```
+
+## Estado del proyecto
+
+Actualmente está implementado el módulo académico del docente. La arquitectura y el modelo de datos permiten incorporar posteriormente módulos administrativos, coordinación académica, dirección y reportes institucionales.
+
+## Licencia
+
+Este proyecto utiliza la licencia MIT definida en `composer.json`.
