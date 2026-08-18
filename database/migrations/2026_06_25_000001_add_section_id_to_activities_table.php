@@ -42,13 +42,31 @@ return new class extends Migration
             }
 
             foreach ($assignments as $assignment) {
+                $studentIds = DB::table('students')
+                    ->where('section_id', $assignment->section_id)
+                    ->pluck('id');
+
+                $hasScoresForSection = DB::table('activity_scores')
+                    ->where('activity_id', $activity->id)
+                    ->whereIn('student_id', $studentIds)
+                    ->exists();
+
+                if (!$activity->is_base && !$hasScoresForSection) {
+                    continue;
+                }
+
                 $copy = (array) $activity;
                 unset($copy['id']);
                 $copy['section_id'] = $assignment->section_id;
                 $copy['created_at'] = now();
                 $copy['updated_at'] = now();
 
-                DB::table('activities')->insert($copy);
+                $newActivityId = DB::table('activities')->insertGetId($copy);
+
+                DB::table('activity_scores')
+                    ->where('activity_id', $activity->id)
+                    ->whereIn('student_id', $studentIds)
+                    ->update(['activity_id' => $newActivityId]);
             }
         }
     }

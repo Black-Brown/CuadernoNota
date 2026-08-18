@@ -60,24 +60,25 @@ class GradeController extends Controller
     {
         $sectionId = $request->integer('section_id') ?: null;
 
-        if ($sectionId !== null) {
-            $isAssignedCourse = DB::table('teacher_sections')
-                ->where('user_id', Auth::id() ?? 1)
-                ->where('section_id', $sectionId)
-                ->where('subject_id', $subjectId)
-                ->exists();
+        if ($sectionId === null) {
+            return response()->json(['message' => 'Debes indicar la sección del curso.'], 422);
+        }
 
-            if (!$isAssignedCourse) {
-                return response()->json([
-                    'message' => 'No tienes permiso para consultar actividades de este curso.',
-                ], 403);
-            }
+        $periodId = $request->integer('period_id') ?: null;
+        $isAssignedCourse = $periodId !== null
+            ? $this->isAssignedCourseForPeriod($sectionId, $subjectId, $periodId)
+            : $this->isAssignedCourse($sectionId, $subjectId);
+
+        if (!$isAssignedCourse) {
+            return response()->json([
+                'message' => 'No tienes permiso para consultar actividades de este curso.',
+            ], 403);
         }
 
         $activities = $this->getActivitiesBySubject->execute(
             $subjectId,
             $sectionId,
-            $request->integer('period_id') ?: null
+            $periodId
         );
 
         return response()->json(['activities' => $activities]);
@@ -85,7 +86,21 @@ class GradeController extends Controller
 
     public function activityGrades(int $activityId, int $periodId): JsonResponse
     {
-        $sectionId = request()->integer('section_id') ?: null;
+        $activity = DB::table('activities')->where('id', $activityId)->first();
+
+        if (!$activity || (int) $activity->period_id !== $periodId) {
+            return response()->json(['message' => 'La actividad no pertenece al período seleccionado.'], 422);
+        }
+
+        $sectionId = request()->integer('section_id') ?: (int) $activity->section_id;
+
+        if (
+            $sectionId !== (int) $activity->section_id
+            || !$this->isAssignedCourseForPeriod($sectionId, (int) $activity->subject_id, $periodId)
+        ) {
+            return response()->json(['message' => 'No tienes permiso para consultar notas de este curso.'], 403);
+        }
+
         $students  = $this->getActivityGrades->execute($activityId, $periodId, $sectionId);
 
         return response()->json(['students' => $students]);
@@ -95,18 +110,14 @@ class GradeController extends Controller
     {
         $sectionId = request()->integer('section_id') ?: null;
 
-        if ($sectionId !== null) {
-            $isAssignedCourse = DB::table('teacher_sections')
-                ->where('user_id', Auth::id() ?? 1)
-                ->where('section_id', $sectionId)
-                ->where('subject_id', $subjectId)
-                ->exists();
+        if ($sectionId === null) {
+            return response()->json(['message' => 'Debes indicar la sección del curso.'], 422);
+        }
 
-            if (!$isAssignedCourse) {
-                return response()->json([
-                    'message' => 'No tienes permiso para consultar notas de este curso.',
-                ], 403);
-            }
+        if (!$this->isAssignedCourseForPeriod($sectionId, $subjectId, $periodId)) {
+            return response()->json([
+                'message' => 'No tienes permiso para consultar notas de este curso.',
+            ], 403);
         }
 
         $grades = $this->getPeriodGrades->execute($subjectId, $periodId, $sectionId);
@@ -121,6 +132,14 @@ class GradeController extends Controller
             'period_id'  => 'required|integer|exists:periods,id',
             'section_id' => 'required|integer|exists:sections,id',
         ]);
+
+        if (!$this->isAssignedCourseForPeriod(
+            (int) $validated['section_id'],
+            (int) $validated['subject_id'],
+            (int) $validated['period_id']
+        )) {
+            return response()->json(['message' => 'No tienes permiso para enviar notas de este curso.'], 403);
+        }
 
         if (!$this->isPeriodOpen((int) $validated['period_id'])) {
             return response()->json([
@@ -153,6 +172,25 @@ class GradeController extends Controller
             'score'            => 'required|numeric|min:0|max:100',
             'period_id'        => 'required_if:type,rp|nullable|integer|exists:periods,id',
         ]);
+
+        $studentSectionId = (int) DB::table('students')
+            ->where('id', $validated['student_id'])
+            ->value('section_id');
+
+        if (!$this->isAssignedCourseForYear(
+            $studentSectionId,
+            (int) $validated['subject_id'],
+            (int) $validated['academic_year_id']
+        )) {
+            return response()->json(['message' => 'No tienes permiso para registrar recuperaciones en este curso.'], 403);
+        }
+
+        if (
+            $validated['type'] === 'rp'
+            && !$this->periodBelongsToYear((int) $validated['period_id'], (int) $validated['academic_year_id'])
+        ) {
+            return response()->json(['message' => 'El período no pertenece al año académico seleccionado.'], 422);
+        }
 
         if ($validated['type'] === 'rp') {
             $finalGrade = $this->registerRecovery->execute(
@@ -237,6 +275,14 @@ class GradeController extends Controller
             ], 422);
         }
 
+        if (!$this->isAssignedCourseForPeriod(
+            (int) $activity->section_id,
+            (int) $validated['subject_id'],
+            (int) $validated['period_id']
+        )) {
+            return response()->json(['message' => 'No tienes permiso para modificar notas de este curso.'], 403);
+        }
+
         if ($this->hasGradesUnderReviewOrOfficial(
             (int) $validated['subject_id'],
             (int) $activity->section_id,
@@ -289,6 +335,41 @@ class GradeController extends Controller
             ->where('period_grades.period_id', $periodId)
             ->where('students.section_id', $sectionId)
             ->whereIn('period_grades.status', ['in_review', 'official'])
+            ->exists();
+    }
+
+    private function isAssignedCourseForPeriod(int $sectionId, int $subjectId, int $periodId): bool
+    {
+        $academicYearId = DB::table('periods')->where('id', $periodId)->value('academic_year_id');
+
+        return $academicYearId !== null
+            && $this->isAssignedCourseForYear($sectionId, $subjectId, (int) $academicYearId);
+    }
+
+    private function isAssignedCourseForYear(int $sectionId, int $subjectId, int $academicYearId): bool
+    {
+        return DB::table('teacher_sections')
+            ->where('user_id', Auth::id() ?? 1)
+            ->where('section_id', $sectionId)
+            ->where('subject_id', $subjectId)
+            ->where('academic_year_id', $academicYearId)
+            ->exists();
+    }
+
+    private function isAssignedCourse(int $sectionId, int $subjectId): bool
+    {
+        return DB::table('teacher_sections')
+            ->where('user_id', Auth::id() ?? 1)
+            ->where('section_id', $sectionId)
+            ->where('subject_id', $subjectId)
+            ->exists();
+    }
+
+    private function periodBelongsToYear(int $periodId, int $academicYearId): bool
+    {
+        return DB::table('periods')
+            ->where('id', $periodId)
+            ->where('academic_year_id', $academicYearId)
             ->exists();
     }
 }

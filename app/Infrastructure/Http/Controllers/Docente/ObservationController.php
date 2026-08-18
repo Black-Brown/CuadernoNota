@@ -166,7 +166,16 @@ class ObservationController extends Controller
     private function validateWorkspaceWrite(array $data): bool
     {
         if (empty($data['section_id']) && empty($data['subject_id']) && empty($data['period_id'])) {
-            return true;
+            $studentSectionId = DB::table('students')
+                ->where('id', $data['student_id'])
+                ->where('active', true)
+                ->value('section_id');
+
+            return $studentSectionId !== null
+                && DB::table('teacher_sections')
+                    ->where('user_id', $data['user_id'])
+                    ->where('section_id', $studentSectionId)
+                    ->exists();
         }
 
         $sectionId = (int) $data['section_id'];

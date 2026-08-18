@@ -766,7 +766,7 @@ export default function Workspace() {
               </p>
 
               <p className="text-xl font-bold font-mono text-red-600">
-                {atRiskCount}%
+                {atRiskCount} {atRiskCount === 1 ? 'estudiante' : 'estudiantes'}
               </p>
             </div>
           </div>
