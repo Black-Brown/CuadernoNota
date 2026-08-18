@@ -9,10 +9,15 @@ use App\Infrastructure\Models\Activity as ActivityModel;
 
 class EloquentActivityRepository implements ActivityRepositoryInterface
 {
-    public function findBySubjectWithScoreCount(int $subjectId): array
+    public function findBySubjectWithScoreCount(int $subjectId, ?int $sectionId = null, ?int $periodId = null): array
     {
         return ActivityModel::where('subject_id', $subjectId)
-            ->withCount(['activityScores as score_count' => fn($q) => $q->whereNotNull('score')])
+            ->when($sectionId, fn($query) => $query->where('section_id', $sectionId))
+            ->when($periodId, fn($query) => $query->where('period_id', $periodId))
+            ->withCount(['activityScores as score_count' => fn($q) => $q
+                ->whereNotNull('score')
+                ->when($periodId, fn($scoreQuery) => $scoreQuery->where('period_id', $periodId))
+            ])
             ->orderBy('is_base', 'desc')
             ->orderBy('name')
             ->get()
@@ -27,6 +32,7 @@ class EloquentActivityRepository implements ActivityRepositoryInterface
                 'icon'        => $a->icon ?? 'assignment',
                 'is_base'     => (bool) $a->is_base,
                 'active'      => (bool) $a->active,
+                'section_id'  => $a->section_id,
                 'period_id'   => $a->period_id,
                 'score_count' => (int) $a->score_count,
             ])
@@ -47,6 +53,7 @@ class EloquentActivityRepository implements ActivityRepositoryInterface
             'icon'             => $data['icon'] ?? 'assignment',
             'is_base'          => false,
             'subject_id'       => $data['subject_id'],
+            'section_id'       => $data['section_id'],
             'period_id'        => $data['period_id'] ?? null,
             'academic_year_id' => $data['academic_year_id'],
             'user_id'          => $data['user_id'],
@@ -64,6 +71,7 @@ class EloquentActivityRepository implements ActivityRepositoryInterface
             'icon'        => $activity->icon ?? 'assignment',
             'is_base'     => false,
             'active'      => (bool) $activity->active,
+            'section_id'  => $activity->section_id,
             'period_id'   => $activity->period_id,
             'score_count' => 0,
         ];

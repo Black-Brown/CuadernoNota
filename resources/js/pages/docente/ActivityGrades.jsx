@@ -2,13 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCourses } from '../../api/courses.api';
-import { getActivitiesBySubject, getActivityGrades, saveActivityScore, submitGrades } from '../../api/grades.api';
+import { getActivitiesBySubject, getActivityGrades, getPeriodGrades, saveActivityScore, submitGrades } from '../../api/grades.api';
 import { getCurrentPeriod } from '../../api/periods.api';
 import DashboardLayout from '../../components/DashboardLayout';
+import usePeriodStore from '../../store/periodStore';
 
 export default function ActivityGrades() {
   const { sectionId, subjectId, activityId } = useParams();
   const queryClient = useQueryClient();
+  const selectedPeriod = usePeriodStore((state) => state.selectedPeriod);
 
   const [localScores, setLocalScores]   = useState([]);
   const [syncStatus, setSyncStatus]     = useState({});
@@ -27,11 +29,32 @@ export default function ActivityGrades() {
   const sectionName = currentCourse?.section_name ?? '';
   const subjectName = currentCourse?.subject_name ?? 'Asignatura';
 
+  // Fetch real current period (reuses cached value from DashboardLayout)
+  const { data: periodData } = useQuery({
+    queryKey: ['currentPeriod'],
+    queryFn:  getCurrentPeriod,
+    staleTime: 5 * 60_000,
+  });
+  const period = selectedPeriod || periodData?.period;
+  const isPeriodOpen = period?.status === 'open';
+
+  const { data: periodLockData } = useQuery({
+    queryKey: ['periodGradesLock', subjectId, period?.id, sectionId],
+    queryFn: () => getPeriodGrades(subjectId, period.id, sectionId),
+    enabled: !!subjectId && !!period?.id && !!sectionId,
+    staleTime: 30_000,
+  });
+
+  const lockedGradeStatus = periodLockData?.grades?.find((grade) =>
+    ['in_review', 'official'].includes(grade.status)
+  )?.status;
+  const canEditGrades = isPeriodOpen && !lockedGradeStatus;
+
   // Resolve real activity name from the subject's activity list
   const { data: activitiesData } = useQuery({
-    queryKey: ['activitiesBySubject', subjectId],
-    queryFn:  () => getActivitiesBySubject(subjectId),
-    enabled:  !!subjectId,
+    queryKey: ['activitiesBySubject', subjectId, sectionId, period?.id],
+    queryFn:  () => getActivitiesBySubject(subjectId, sectionId, period.id),
+    enabled:  !!subjectId && !!sectionId && !!period?.id,
   });
 
   const currentActivity = activitiesData?.activities?.find(
@@ -39,20 +62,17 @@ export default function ActivityGrades() {
   );
   const activityName = currentActivity?.name ?? 'Actividad';
 
-  // Fetch real current period (reuses cached value from DashboardLayout)
-  const { data: periodData } = useQuery({
-    queryKey: ['currentPeriod'],
-    queryFn:  getCurrentPeriod,
-    staleTime: 5 * 60_000,
-  });
-  const period = periodData?.period;
-
   // Fetch grades — pass sectionId so backend returns the correct section's students
   const { data: activityGradesData } = useQuery({
     queryKey: ['activityGrades', activityId, period?.id, sectionId],
     queryFn:  () => getActivityGrades(activityId, period.id, sectionId),
-    enabled:  !!activityId && !!period?.id,
+    enabled:  !!activityId && !!period?.id && !!sectionId && !!currentActivity,
   });
+
+  useEffect(() => {
+    setLocalScores([]);
+    setSyncStatus({});
+  }, [activityId, period?.id, sectionId]);
 
   useEffect(() => {
     if (activityGradesData?.students) {
@@ -65,21 +85,31 @@ export default function ActivityGrades() {
     mutationFn: saveActivityScore,
     onSuccess: () => {
       // Invalidate the period-grades cache so Workspace reflects new data immediately
-      queryClient.invalidateQueries({ queryKey: ['periodGrades', subjectId] });
+      queryClient.invalidateQueries({ queryKey: ['periodGrades', subjectId, period?.id, sectionId] });
+      queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, period?.id] });
     },
   });
 
   const submitGradesMutation = useMutation({
     mutationFn: submitGrades,
     onSuccess:  () => {
-      queryClient.invalidateQueries({ queryKey: ['periodGrades', subjectId] });
-      queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId] });
+      queryClient.invalidateQueries({ queryKey: ['periodGrades', subjectId, period?.id, sectionId] });
+      queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, period?.id] });
       showToast('Calificaciones enviadas y finalizadas correctamente.');
     },
   });
 
   // Per-cell change: update UI immediately, persist in background
   const handleScoreChange = (studentId, key, val) => {
+    if (!canEditGrades) {
+      showToast(
+        lockedGradeStatus
+          ? 'Estas calificaciones ya están en revisión u oficiales.'
+          : 'Este período está cerrado. Solicita permiso al coordinador para modificarlo.'
+      );
+      return;
+    }
+
     const numVal = val === '' ? '' : Number(val);
 
     setLocalScores(prev =>
@@ -105,7 +135,7 @@ export default function ActivityGrades() {
 
   // "Guardar Progreso" button and Ctrl+Enter: persist every filled cell
   const saveAll = useCallback(() => {
-    if (!period) return;
+    if (!period || !canEditGrades) return;
     localScores.forEach(student => {
       ['c1', 'c2', 'c3'].forEach((key, i) => {
         const val = student[key];
@@ -125,9 +155,9 @@ export default function ActivityGrades() {
         }
       });
     });
-    queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId] });
+    queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, period.id] });
     showToast('Progreso guardado correctamente.');
-  }, [localScores, period, activityId, subjectId, queryClient]);
+  }, [localScores, period, canEditGrades, activityId, subjectId, sectionId, queryClient]);
 
   // Ctrl+Enter shortcut
   useEffect(() => {
@@ -205,13 +235,14 @@ export default function ActivityGrades() {
         <div className="flex items-center gap-2">
           <button
             onClick={saveAll}
-            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs rounded-xl shadow-sm transition-all"
+            disabled={!canEditGrades}
+            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs rounded-xl shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             Guardar Progreso
           </button>
           <button
-            onClick={() => period && submitGradesMutation.mutate({ subject_id: Number(subjectId), period_id: period.id })}
-            disabled={!period || submitGradesMutation.isPending}
+            onClick={() => period && submitGradesMutation.mutate({ subject_id: Number(subjectId), period_id: period.id, section_id: Number(sectionId) })}
+            disabled={!period || submitGradesMutation.isPending || !canEditGrades}
             className="px-4 py-2 bg-slate-950 text-white hover:bg-slate-900 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined text-[18px]">check_circle</span>
@@ -274,6 +305,28 @@ export default function ActivityGrades() {
 
       </div>
 
+      {!canEditGrades && (
+        <div className="mb-6 rounded-xl border border-amber-100 bg-amber-50 px-5 py-4 text-sm text-amber-800 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-[22px]">lock</span>
+            <div>
+              <p className="font-extrabold">
+                {lockedGradeStatus === 'in_review'
+                  ? 'Calificaciones en revisión'
+                  : lockedGradeStatus === 'official'
+                    ? 'Calificaciones oficiales'
+                    : 'Período cerrado'}
+              </p>
+              <p className="mt-0.5 text-xs font-semibold leading-5">
+                {lockedGradeStatus
+                  ? 'Puedes consultar estas notas, pero no agregar ni modificar datos mientras coordinación las revisa o ya estén aprobadas.'
+                  : 'Puedes consultar estas notas, pero no agregar ni modificar datos hasta que coordinación active el período o autorice el cambio.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Grade entry table */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm mb-6">
         <div className="overflow-x-auto">
@@ -328,6 +381,7 @@ export default function ActivityGrades() {
                           max="100"
                           value={student[key] ?? ''}
                           onChange={(e) => handleScoreChange(student.student_id, key, e.target.value)}
+                          disabled={!canEditGrades}
                           className={`w-full text-center font-mono py-1.5 border rounded-lg focus:ring-1 focus:outline-none text-sm transition-colors ${
                             student[key] !== null && student[key] !== '' && Number(student[key]) < 70
                               ? 'border-red-200 text-red-600 bg-red-50/30 focus:ring-red-400 focus:border-red-400'

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getActivitiesBySubject } from '../api/grades.api';
-import { getPeriods } from '../api/periods.api';
 import { createActivity, updateActivity } from '../api/activities.api';
 
 // Icon / color map for known base activities
@@ -35,8 +34,10 @@ const EMPTY_FORM = {
   weight:      '',
 };
 
-export default function ManageActivitiesModal({ subjectId, onClose }) {
+export default function ManageActivitiesModal({ subjectId, sectionId, periodId, periodName, periodStatus, lockedGradeStatus, onClose }) {
   const queryClient = useQueryClient();
+  const isPeriodOpen = periodStatus === 'open';
+  const canEditActivities = isPeriodOpen && !lockedGradeStatus;
 
   // 'list' | 'create'
   const [view, setView]           = useState('list');
@@ -48,50 +49,43 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
 
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: activitiesData, isLoading } = useQuery({
-    queryKey: ['activitiesBySubject', subjectId],
-    queryFn:  () => getActivitiesBySubject(subjectId),
-    enabled:  !!subjectId,
-  });
-
-  const { data: periodsData } = useQuery({
-    queryKey: ['periods'],
-    queryFn:  getPeriods,
-    staleTime: 5 * 60_000,
+    queryKey: ['activitiesBySubject', subjectId, sectionId, periodId],
+    queryFn:  () => getActivitiesBySubject(subjectId, sectionId, periodId),
+    enabled:  !!subjectId && !!sectionId && !!periodId,
   });
 
   const activities = activitiesData?.activities || [];
-  const periods    = periodsData?.periods || [];
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const toggleMutation = useMutation({
     mutationFn: ({ id }) => updateActivity(id, {}), // PATCH toggles active
     onSuccess:  () => {
-      queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId] });
+      queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, periodId] });
       showToast('Estado actualizado correctamente.');
     },
-    onError: () => showToast('Error al actualizar el estado.', 'error'),
+    onError: (error) => showToast(error?.response?.data?.message || 'Error al actualizar el estado.', 'error'),
   });
 
   const renameMutation = useMutation({
     mutationFn: ({ id, name }) => updateActivity(id, { name }),
     onSuccess:  () => {
-      queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId] });
+      queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, periodId] });
       setEditingId(null);
       setEditingName('');
       showToast('Nombre actualizado correctamente.');
     },
-    onError: () => showToast('Error al renombrar.', 'error'),
+    onError: (error) => showToast(error?.response?.data?.message || 'Error al renombrar.', 'error'),
   });
 
   const createMutation = useMutation({
     mutationFn: (payload) => createActivity(payload),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId] });
+      queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, periodId] });
       setForm(EMPTY_FORM);
       setView('list');
       showToast(`"${data.activity?.name ?? 'Actividad'}" creada correctamente.`);
     },
-    onError: () => showToast('Error al crear la actividad.', 'error'),
+    onError: (error) => showToast(error?.response?.data?.message || 'Error al crear la actividad.', 'error'),
   });
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -101,9 +95,31 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
     setTimeout(() => setToastMsg(''), 3500);
   };
 
-  const handleToggle = (act) => toggleMutation.mutate({ id: act.id });
+  const handleToggle = (act) => {
+    if (!canEditActivities) {
+      showToast(
+        lockedGradeStatus
+          ? 'Estas calificaciones ya están en revisión u oficiales.'
+          : 'Este período está cerrado. Solicita permiso al coordinador para modificarlo.',
+        'error'
+      );
+      return;
+    }
+
+    toggleMutation.mutate({ id: act.id });
+  };
 
   const handleRenameConfirm = () => {
+    if (!canEditActivities) {
+      showToast(
+        lockedGradeStatus
+          ? 'Estas calificaciones ya están en revisión u oficiales.'
+          : 'Este período está cerrado. Solicita permiso al coordinador para modificarlo.',
+        'error'
+      );
+      return;
+    }
+
     const trimmed = editingName.trim();
     if (!trimmed || !editingId) return;
     renameMutation.mutate({ id: editingId, name: trimmed });
@@ -114,14 +130,25 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
 
   const handleCreateSubmit = (e) => {
     e.preventDefault();
+    if (!canEditActivities) {
+      showToast(
+        lockedGradeStatus
+          ? 'Estas calificaciones ya están en revisión u oficiales.'
+          : 'Este período está cerrado. Solicita permiso al coordinador para modificarlo.',
+        'error'
+      );
+      return;
+    }
+
     if (!form.name.trim()) return;
 
     createMutation.mutate({
       name:        form.name.trim(),
       subject_id:  subjectId,
+      section_id:  Number(sectionId),
       description: form.description || null,
       type:        form.type || null,
-      period_id:   form.period_id ? Number(form.period_id) : null,
+      period_id:   Number(periodId),
       status:      form.status || 'active',
       due_date:    form.due_date || null,
       weight:      form.weight !== '' ? Number(form.weight) : null,
@@ -197,6 +224,14 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
           {/* ── VIEW: LIST ─────────────────────────────────────────────────── */}
           {view === 'list' && (
             <>
+              {!canEditActivities && (
+                <div className="mx-6 mt-5 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+                  {lockedGradeStatus
+                    ? 'Estas calificaciones ya están en revisión u oficiales. Puedes consultar las actividades, pero no crear, renombrar ni desactivar.'
+                    : 'Este período está cerrado. Puedes consultar las actividades, pero no crear, renombrar ni desactivar hasta que coordinación lo active.'}
+                </div>
+              )}
+
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
@@ -287,7 +322,7 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
                                 className="sr-only peer"
                                 checked={act.active}
                                 onChange={() => handleToggle(act)}
-                                disabled={toggleMutation.isPending}
+                                disabled={toggleMutation.isPending || !canEditActivities}
                               />
                               <div className="w-11 h-6 bg-slate-200 rounded-full peer
                                 peer-checked:after:translate-x-full peer-checked:after:border-white
@@ -303,7 +338,7 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
                         <td className="px-6 py-3.5 text-right">
                           <button
                             onClick={() => { setEditingId(act.id); setEditingName(act.name); }}
-                            disabled={!act.active || isEditing}
+                            disabled={!act.active || isEditing || !canEditActivities}
                             title="Renombrar"
                             className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
@@ -319,8 +354,9 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
               {/* Add button */}
               <div className="px-6 py-4 border-t border-slate-200">
                 <button
-                  onClick={() => setView('create')}
-                  className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors group"
+                  onClick={() => canEditActivities && setView('create')}
+                  disabled={!canEditActivities}
+                  className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors group disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <div className="w-7 h-7 rounded-full border-2 border-dashed border-slate-300 group-hover:border-slate-700 group-hover:bg-slate-50 flex items-center justify-center transition-colors">
                     <span className="material-symbols-outlined text-[16px]">add</span>
@@ -356,6 +392,7 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
                   placeholder="Ej. Proyecto Final, Examen Parcial, Ensayo..."
                   value={form.name}
                   onChange={(e) => handleFormChange('name', e.target.value)}
+                  disabled={!canEditActivities}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
                 />
               </div>
@@ -370,6 +407,7 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
                   placeholder="Objetivos, instrucciones o rúbrica de la actividad..."
                   value={form.description}
                   onChange={(e) => handleFormChange('description', e.target.value)}
+                  disabled={!canEditActivities}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors resize-none"
                 />
               </div>
@@ -385,6 +423,7 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
                       required
                       value={form.type}
                       onChange={(e) => handleFormChange('type', e.target.value)}
+                      disabled={!canEditActivities}
                       className="w-full appearance-none px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
                     >
                       <option value="">Seleccionar</option>
@@ -400,23 +439,10 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
 
                 <div className="space-y-1.5">
                   <label className="text-[11px] uppercase tracking-wide font-semibold text-slate-500">
-                    Período <span className="text-red-500">*</span>
+                    Período
                   </label>
-                  <div className="relative">
-                    <select
-                      required
-                      value={form.period_id}
-                      onChange={(e) => handleFormChange('period_id', e.target.value)}
-                      className="w-full appearance-none px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
-                    >
-                      <option value="">Seleccionar</option>
-                      {periods.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[18px]">
-                      expand_more
-                    </span>
+                  <div className="flex min-h-[42px] items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700">
+                    {periodName || 'Período seleccionado'}
                   </div>
                 </div>
 
@@ -428,6 +454,7 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
                     <select
                       value={form.status}
                       onChange={(e) => handleFormChange('status', e.target.value)}
+                      disabled={!canEditActivities}
                       className="w-full appearance-none px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
                     >
                       <option value="active">Activo</option>
@@ -451,6 +478,7 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
                     type="date"
                     value={form.due_date}
                     onChange={(e) => handleFormChange('due_date', e.target.value)}
+                    disabled={!canEditActivities}
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
                   />
                 </div>
@@ -468,6 +496,7 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
                       placeholder="Ej. 100"
                       value={form.weight}
                       onChange={(e) => handleFormChange('weight', e.target.value)}
+                      disabled={!canEditActivities}
                       className="w-full px-4 py-2.5 pr-9 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-semibold pointer-events-none">
@@ -501,7 +530,7 @@ export default function ManageActivitiesModal({ subjectId, onClose }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={createMutation.isPending || !form.name.trim() || !form.type || !form.period_id}
+                  disabled={createMutation.isPending || !form.name.trim() || !form.type || !periodId || !canEditActivities}
                   className="px-5 py-2.5 bg-slate-950 text-white font-bold text-sm rounded-xl hover:bg-slate-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {createMutation.isPending ? (

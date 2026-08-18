@@ -12,7 +12,7 @@ class Activity extends Model
 
     protected $fillable = [
         'name', 'description', 'type', 'is_base',
-        'user_id', 'subject_id', 'academic_year_id', 'period_id',
+        'user_id', 'subject_id', 'section_id', 'academic_year_id', 'period_id',
         'active', 'status', 'due_date', 'weight', 'icon',
     ];
 
@@ -31,6 +31,11 @@ class Activity extends Model
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
+    }
+
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(Section::class);
     }
 
     public function academicYear(): BelongsTo
