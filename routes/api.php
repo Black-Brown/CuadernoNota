@@ -1,6 +1,7 @@
 <?php
 
 use App\Infrastructure\Http\Controllers\AuthController;
+use App\Infrastructure\Http\Controllers\GoogleAuthController;
 use App\Infrastructure\Http\Controllers\Docente\ActivityController;
 use App\Infrastructure\Http\Controllers\Docente\AttendanceController;
 use App\Infrastructure\Http\Controllers\Docente\DashboardController;
@@ -12,6 +13,9 @@ use Illuminate\Support\Facades\Route;
 // ── Rutas públicas ────────────────────────────────────────────────────────────
 Route::post('/auth/login',           [AuthController::class, 'login']);
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect']);
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
+Route::post('/auth/google/exchange', [GoogleAuthController::class, 'exchange']);
 
 // ── Rutas autenticadas ────────────────────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {
