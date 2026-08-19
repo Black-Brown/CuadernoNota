@@ -11,15 +11,18 @@ class EloquentActivityRepository implements ActivityRepositoryInterface
 {
     public function findBySubjectWithScoreCount(int $subjectId, ?int $sectionId = null, ?int $periodId = null): array
     {
-        return ActivityModel::where('subject_id', $subjectId)
-            ->when($sectionId, fn($query) => $query->where('section_id', $sectionId))
-            ->when($periodId, fn($query) => $query->where('period_id', $periodId))
+        return ActivityModel::query()
+            ->with(['template', 'courseOffering.section'])
+            ->whereHas('courseOffering', fn($query) => $query
+                ->where('subject_id', $subjectId)
+                ->when($sectionId, fn($offeringQuery) => $offeringQuery->where('section_id', $sectionId)))
+            ->when($periodId, fn($query) => $query->where('course_activities.period_id', $periodId))
             ->withCount(['activityScores as score_count' => fn($q) => $q
                 ->whereNotNull('score')
                 ->when($periodId, fn($scoreQuery) => $scoreQuery->where('period_id', $periodId))
             ])
-            ->orderBy('is_base', 'desc')
-            ->orderBy('name')
+            ->orderByRaw('CASE WHEN activity_template_id IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('course_activities.name')
             ->get()
             ->map(fn($a) => [
                 'id'          => $a->id,
@@ -43,21 +46,25 @@ class EloquentActivityRepository implements ActivityRepositoryInterface
     {
         $status = $data['status'] ?? 'active';
 
+        $offeringId = \App\Infrastructure\Models\CourseOffering::query()
+            ->where('section_id', $data['section_id'])
+            ->where('subject_id', $data['subject_id'])
+            ->value('id');
+
+        if (!$offeringId) {
+            throw new \InvalidArgumentException('El curso indicado no existe.');
+        }
+
         $activity = ActivityModel::create([
+            'course_offering_id' => $offeringId,
             'name'             => $data['name'],
             'description'      => $data['description'] ?? null,
             'type'             => $data['type'] ?? null,
             'status'           => $status,
             'due_date'         => $data['due_date'] ?? null,
             'weight'           => isset($data['weight']) ? (float) $data['weight'] : null,
-            'icon'             => $data['icon'] ?? 'assignment',
-            'is_base'          => false,
-            'subject_id'       => $data['subject_id'],
-            'section_id'       => $data['section_id'],
             'period_id'        => $data['period_id'] ?? null,
-            'academic_year_id' => $data['academic_year_id'],
-            'user_id'          => $data['user_id'],
-            'active'           => $status === 'active',
+            'created_by'       => $data['user_id'],
         ]);
 
         return [
@@ -80,7 +87,7 @@ class EloquentActivityRepository implements ActivityRepositoryInterface
     public function toggleActive(int $activityId): array
     {
         $activity = ActivityModel::findOrFail($activityId);
-        $activity->active = !$activity->active;
+        $activity->status = $activity->status === 'active' ? 'inactive' : 'active';
         $activity->save();
 
         return [

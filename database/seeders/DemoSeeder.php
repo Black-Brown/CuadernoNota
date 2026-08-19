@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Application\Activity\EnsureDefaultCourseActivities;
+use App\Infrastructure\Models\CourseOffering;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -68,14 +70,19 @@ class DemoSeeder extends Seeder
 
         // ── 4. Asignatura ─────────────────────────────────────────────────────
         DB::table('subjects')->updateOrInsert(
-            ['code' => 'LEN', 'grade_id' => $gradeId],
+            ['code' => 'LEN'],
             [
                 'name'       => 'Lengua Española',
+                'active'     => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]
         );
         $subjectId = DB::table('subjects')->where('code', 'LEN')->value('id');
+        DB::table('grade_subjects')->updateOrInsert(
+            ['grade_id' => $gradeId, 'subject_id' => $subjectId],
+            ['created_at' => now(), 'updated_at' => now()]
+        );
 
         // ── 5. Períodos (1 a 4) ───────────────────────────────────────────────
         $periods = [
@@ -107,17 +114,18 @@ class DemoSeeder extends Seeder
         // ── 6. Docente asignado a la sección ──────────────────────────────────
         $teacherId = User::where('email', 'docente@demo.com')->value('id');
 
-        DB::table('teacher_sections')->updateOrInsert(
-            [
-                'user_id'          => $teacherId,
-                'section_id'       => $sectionId,
-                'subject_id'       => $subjectId,
-                'academic_year_id' => $yearId,
-            ],
-            [
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]
+        DB::table('course_offerings')->updateOrInsert(
+            ['section_id' => $sectionId, 'subject_id' => $subjectId],
+            ['active' => true, 'created_at' => now(), 'updated_at' => now()]
+        );
+        $offeringId = DB::table('course_offerings')
+            ->where('section_id', $sectionId)
+            ->where('subject_id', $subjectId)
+            ->value('id');
+        DB::table('teacher_assignments')->updateOrInsert(
+            ['teacher_id' => $teacherId, 'course_offering_id' => $offeringId],
+            ['assigned_by' => null, 'assigned_at' => now(), 'active' => true,
+             'created_at' => now(), 'updated_at' => now()]
         );
 
         // ── 7. Estudiantes ────────────────────────────────────────────────────
@@ -142,23 +150,10 @@ class DemoSeeder extends Seeder
             );
         }
 
-        // ── 8. Actividades base ───────────────────────────────────────────────
-        $baseActivities = [
-            'Proyectos', 'Examen', 'Tareas', 'Ensayo',
-            'Producción en aula', 'Diagnósticas',
-        ];
-
-        foreach ($baseActivities as $actName) {
-            DB::table('activities')->updateOrInsert(
-                ['name' => $actName, 'subject_id' => $subjectId, 'academic_year_id' => $yearId],
-                [
-                    'is_base'    => true,
-                    'user_id'    => $teacherId,
-                    'active'     => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]
-            );
-        }
+        // ── 8. Actividades base por período ───────────────────────────────────
+        app(EnsureDefaultCourseActivities::class)->execute(
+            CourseOffering::findOrFail($offeringId),
+            $teacherId,
+        );
     }
 }

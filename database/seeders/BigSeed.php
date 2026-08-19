@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Application\Activity\EnsureDefaultCourseActivities;
+use App\Infrastructure\Models\CourseOffering;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -196,14 +198,27 @@ class BigSeed extends Seeder
             ['3ro Primaria', 'LEN-3',  'Lengua Española'],
         ];
 
+        $catalogCodes = [
+            'Matemática' => 'MAT',
+            'Lengua Española' => 'LEN',
+            'Inglés' => 'ING',
+            'Ciencias Naturales' => 'CNA',
+            'Ciencias Sociales' => 'CSO',
+        ];
+
         $ids = [];
         foreach ($subjects as [$gradeName, $code, $name]) {
             if (!isset($gradeIds[$gradeName])) continue;
             DB::table('subjects')->updateOrInsert(
-                ['code' => $code, 'grade_id' => $gradeIds[$gradeName]],
-                ['name' => $name, 'created_at' => now(), 'updated_at' => now()]
+                ['name' => $name],
+                ['code' => $catalogCodes[$name], 'active' => true, 'created_at' => now(), 'updated_at' => now()]
             );
-            $ids[$code] = DB::table('subjects')->where('code', $code)->value('id');
+            $subjectId = DB::table('subjects')->where('name', $name)->value('id');
+            DB::table('grade_subjects')->updateOrInsert(
+                ['grade_id' => $gradeIds[$gradeName], 'subject_id' => $subjectId],
+                ['created_at' => now(), 'updated_at' => now()]
+            );
+            $ids[$code] = $subjectId;
         }
         return $ids;
     }
@@ -266,10 +281,22 @@ class BigSeed extends Seeder
 
         foreach ($assignments as [$uid, $sk, $sc]) {
             if (!isset($sids[$sk], $subIds[$sc])) continue;
-            DB::table('teacher_sections')->updateOrInsert(
-                ['user_id' => $uid, 'section_id' => $sids[$sk],
-                 'subject_id' => $subIds[$sc], 'academic_year_id' => $yearId],
-                ['created_at' => now(), 'updated_at' => now()]
+            DB::table('course_offerings')->updateOrInsert(
+                ['section_id' => $sids[$sk], 'subject_id' => $subIds[$sc]],
+                ['active' => true, 'created_at' => now(), 'updated_at' => now()]
+            );
+            $offeringId = DB::table('course_offerings')
+                ->where('section_id', $sids[$sk])
+                ->where('subject_id', $subIds[$sc])
+                ->value('id');
+            DB::table('teacher_assignments')->updateOrInsert(
+                ['teacher_id' => $uid, 'course_offering_id' => $offeringId],
+                ['assigned_by' => null, 'assigned_at' => now(), 'active' => true,
+                 'created_at' => now(), 'updated_at' => now()]
+            );
+            app(EnsureDefaultCourseActivities::class)->execute(
+                CourseOffering::findOrFail($offeringId),
+                $uid,
             );
         }
     }
@@ -317,11 +344,6 @@ class BigSeed extends Seeder
             $sid = $subIds[$code];
             $actIds[$code] = [];
             foreach ($baseNames as $name) {
-                DB::table('activities')->updateOrInsert(
-                    ['name' => $name, 'subject_id' => $sid, 'academic_year_id' => $yearId],
-                    ['is_base' => true, 'user_id' => $tIds['main'], 'active' => true,
-                     'created_at' => now(), 'updated_at' => now()]
-                );
                 $actIds[$code][$name] = DB::table('activities')
                     ->where('name', $name)->where('subject_id', $sid)
                     ->where('academic_year_id', $yearId)->value('id');

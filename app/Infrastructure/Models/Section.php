@@ -31,4 +31,9 @@ class Section extends Model
     {
         return $this->hasMany(TeacherSection::class);
     }
+
+    public function courseOfferings(): HasMany
+    {
+        return $this->hasMany(CourseOffering::class);
+    }
 }
