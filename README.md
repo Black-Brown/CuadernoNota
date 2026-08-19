@@ -127,6 +127,12 @@ APP_DEBUG=true
 APP_URL=http://localhost:8000
 
 DB_CONNECTION=sqlite
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:8000/api/auth/google/callback
+GOOGLE_WORKSPACE_DOMAIN=happylearningschool.net
+FRONTEND_URL=http://localhost:8000
 ```
 
 Crea el archivo de base de datos y genera la clave de la aplicación:
@@ -229,6 +235,19 @@ Las rutas de la API se encuentran bajo `/api`. Las operaciones del módulo docen
 - Una asignación válida al curso, sección y año académico solicitado.
 
 El backend valida estas condiciones aunque la interfaz o una solicitud externa intente enviar identificadores de otro curso.
+
+## Acceso con Google Workspace
+
+El inicio de sesión con Google está restringido a cuentas institucionales administradas bajo `happylearningschool.net`. El usuario también debe existir previamente en Cuaderno Nota y mantener su cuenta activa; Google autentica su identidad, pero no asigna roles ni cursos automáticamente.
+
+Para habilitarlo:
+
+1. Crea un cliente OAuth 2.0 de tipo **Aplicación web** en Google Cloud Console.
+2. Registra `http://localhost:8000/api/auth/google/callback` como URI de redirección durante el desarrollo.
+3. Completa las variables `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` del archivo `.env`.
+4. Ejecuta las migraciones para agregar la identidad de Google a los usuarios.
+
+En producción, reemplaza las URLs locales por el dominio HTTPS definitivo y registra exactamente la misma URI en Google Cloud Console.
 
 ## Pruebas
 

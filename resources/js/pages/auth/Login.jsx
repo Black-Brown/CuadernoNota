@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { login } from '../../api/auth.api';
+import { exchangeGoogleCode, login } from '../../api/auth.api';
 import useAuthStore from '../../store/authStore';
 
 const roleRoutes = {
@@ -10,11 +10,23 @@ const roleRoutes = {
   admin:       '/admin/dashboard',
 };
 
+const googleErrorMessages = {
+  access_denied: 'El acceso con Google fue cancelado.',
+  invalid_state: 'La solicitud de Google expiró. Intenta nuevamente.',
+  provider_error: 'No fue posible comunicarse con Google. Intenta nuevamente.',
+  invalid_domain: 'Utiliza una cuenta institucional @happylearningschool.net.',
+  not_registered: 'Tu correo institucional no está registrado en Cuaderno Nota.',
+  inactive: 'Tu cuenta está desactivada. Contacta al administrador.',
+  account_mismatch: 'Esta cuenta está vinculada a otra identidad de Google.',
+};
+
 export default function Login() {
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
+  const googleExchangeStarted = useRef(false);
 
   const [form, setForm] = useState({ email: '', password: '' });
+  const [googleError, setGoogleError] = useState('');
 
   const mutation = useMutation({
     mutationFn: login,
@@ -23,6 +35,34 @@ export default function Login() {
       navigate(roleRoutes[data.user.role] || '/');
     },
   });
+
+  const googleMutation = useMutation({
+    mutationFn: exchangeGoogleCode,
+    onSuccess: (data) => {
+      setAuth(data.user, data.token);
+      navigate(roleRoutes[data.user.role] || '/');
+    },
+  });
+
+  useEffect(() => {
+    if (googleExchangeStarted.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('google_code');
+    const error = params.get('google_error');
+
+    if (!code && !error) return;
+
+    googleExchangeStarted.current = true;
+    window.history.replaceState({}, document.title, '/login');
+
+    if (error) {
+      setGoogleError(googleErrorMessages[error] || 'No fue posible iniciar sesión con Google.');
+      return;
+    }
+
+    googleMutation.mutate(code);
+  }, []);
 
   const handleChange = (e) =>
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -71,12 +111,38 @@ export default function Login() {
           <div className="bg-white border border-slate-200 p-8 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.03)]">
             
             {/* Error Banner */}
-            {mutation.isError && (
+            {(mutation.isError || googleMutation.isError || googleError) && (
               <div className="mb-6 rounded-xl bg-red-50 border border-red-200 p-4 text-xs text-red-700 flex items-start gap-2.5">
                 <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
-                <span>{mutation.error?.response?.data?.message || 'Credenciales inválidas. Por favor intenta de nuevo.'}</span>
+                <span>
+                  {googleError
+                    || googleMutation.error?.response?.data?.message
+                    || mutation.error?.response?.data?.message
+                    || 'Credenciales inválidas. Por favor intenta de nuevo.'}
+                </span>
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={() => window.location.assign('/api/auth/google/redirect')}
+              disabled={googleMutation.isPending}
+              className="w-full border border-slate-300 bg-white text-slate-700 font-semibold text-sm py-3.5 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.5-.2-2.2H12v4.3h5.4a4.7 4.7 0 0 1-2 3v2.8h3.3c1.9-1.8 2.9-4.4 2.9-7.9Z" />
+                <path fill="#34A853" d="M12 22c2.7 0 5-.9 6.7-2.4l-3.3-2.8c-.9.6-2.1 1-3.4 1a5.9 5.9 0 0 1-5.5-4.1H3.1v2.9A10 10 0 0 0 12 22Z" />
+                <path fill="#FBBC05" d="M6.5 13.7A6 6 0 0 1 6.2 12c0-.6.1-1.2.3-1.7V7.4H3.1A10 10 0 0 0 2 12c0 1.7.4 3.2 1.1 4.6l3.4-2.9Z" />
+                <path fill="#EA4335" d="M12 6.2c1.5 0 2.8.5 3.9 1.5l2.9-2.9A9.8 9.8 0 0 0 12 2a10 10 0 0 0-8.9 5.4l3.4 2.9A5.9 5.9 0 0 1 12 6.2Z" />
+              </svg>
+              {googleMutation.isPending ? 'Validando cuenta...' : 'Continuar con Google'}
+            </button>
+
+            <div className="my-6 flex items-center gap-3">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">o usa tu contraseña</span>
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
               
@@ -96,9 +162,9 @@ export default function Login() {
                     type="email"
                     value={form.email}
                     onChange={handleChange}
-                    placeholder="usuario@institucion.edu" 
+                    placeholder="usuario@happylearningschool.net"
                     required 
-                    disabled={mutation.isPending}
+                    disabled={mutation.isPending || googleMutation.isPending}
                   />
                 </div>
               </div>
@@ -126,7 +192,7 @@ export default function Login() {
                     onChange={handleChange}
                     placeholder="••••••••" 
                     required 
-                    disabled={mutation.isPending}
+                    disabled={mutation.isPending || googleMutation.isPending}
                   />
                 </div>
               </div>
@@ -135,7 +201,7 @@ export default function Login() {
               <button 
                 className="w-full bg-slate-950 text-white font-semibold text-sm py-3.5 rounded-xl hover:bg-slate-900 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group disabled:bg-slate-400 disabled:cursor-not-allowed" 
                 type="submit"
-                disabled={mutation.isPending}
+                disabled={mutation.isPending || googleMutation.isPending}
               >
                 {mutation.isPending ? (
                   <>
