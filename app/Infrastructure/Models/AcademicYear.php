@@ -32,11 +32,6 @@ class AcademicYear extends Model
         return $this->hasMany(Student::class);
     }
 
-    public function activities(): HasMany
-    {
-        return $this->hasMany(Activity::class);
-    }
-
     public function finalGrades(): HasMany
     {
         return $this->hasMany(FinalGrade::class);

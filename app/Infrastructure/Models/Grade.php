@@ -20,8 +20,8 @@ class Grade extends Model
         return $this->hasMany(Section::class);
     }
 
-    public function subjects(): HasMany
+    public function subjects(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
-        return $this->hasMany(Subject::class);
+        return $this->belongsToMany(Subject::class, 'grade_subjects')->withTimestamps();
     }
 }

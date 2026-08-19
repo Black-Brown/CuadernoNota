@@ -1,6 +1,7 @@
 <?php
 
 use App\Infrastructure\Http\Controllers\AuthController;
+use App\Infrastructure\Http\Controllers\Admin\TeacherAssignmentController;
 use App\Infrastructure\Http\Controllers\Docente\ActivityController;
 use App\Infrastructure\Http\Controllers\Docente\AttendanceController;
 use App\Infrastructure\Http\Controllers\Docente\DashboardController;
@@ -17,6 +18,15 @@ Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me',      [AuthController::class, 'me']);
+
+    Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/teacher-assignments/options', [TeacherAssignmentController::class, 'options'])->name('teacher-assignments.options');
+        Route::get('/teacher-assignments', [TeacherAssignmentController::class, 'index'])->name('teacher-assignments.index');
+        Route::post('/teachers', [TeacherAssignmentController::class, 'storeTeacher'])->name('teachers.store');
+        Route::post('/teacher-assignments', [TeacherAssignmentController::class, 'store'])->name('teacher-assignments.store');
+        Route::patch('/teacher-assignments/{teacherAssignment}', [TeacherAssignmentController::class, 'update'])->name('teacher-assignments.update');
+        Route::delete('/teacher-assignments/{teacherAssignment}', [TeacherAssignmentController::class, 'destroy'])->name('teacher-assignments.destroy');
+    });
 
     // ── Módulo Docente ────────────────────────────────────────────────────────
     Route::middleware('role:teacher')->prefix('docente')->name('docente.')->group(function () {

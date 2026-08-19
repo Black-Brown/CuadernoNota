@@ -3,18 +3,20 @@
 namespace App\Infrastructure\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Subject extends Model
 {
     protected $table = 'subjects';
 
-    protected $fillable = ['grade_id', 'name', 'code'];
+    protected $fillable = ['name', 'code', 'active'];
 
-    public function grade(): BelongsTo
+    protected $casts = ['active' => 'boolean'];
+
+    public function grades(): BelongsToMany
     {
-        return $this->belongsTo(Grade::class);
+        return $this->belongsToMany(Grade::class, 'grade_subjects')->withTimestamps();
     }
 
     public function teacherSections(): HasMany
@@ -22,9 +24,9 @@ class Subject extends Model
         return $this->hasMany(TeacherSection::class);
     }
 
-    public function activities(): HasMany
+    public function courseOfferings(): HasMany
     {
-        return $this->hasMany(Activity::class);
+        return $this->hasMany(CourseOffering::class);
     }
 
     public function activityScores(): HasMany
