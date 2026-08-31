@@ -98,6 +98,17 @@ class AdminTeacherAssignmentTest extends TestCase
             'active' => true,
         ]);
 
+        // Eloquent serializes loaded relationships using snake_case, including
+        // assignedBy -> assigned_by (the related object, not only the FK).
+        $this->getJson('/api/admin/teacher-assignments')->assertOk()
+            ->assertJsonPath('0.teacher.name', 'Profesora de Robótica')
+            ->assertJsonPath('0.course_offering.section.grade.name', '4to Primaria')
+            ->assertJsonPath('0.course_offering.section.name', 'A')
+            ->assertJsonPath('0.course_offering.section.shift', 'Matutina')
+            ->assertJsonPath('0.course_offering.subject.name', 'Robótica')
+            ->assertJsonPath('0.course_offering.section.academic_year.name', '2026-2027')
+            ->assertJsonPath('0.assigned_by.name', $admin->name);
+
         $this->assertSame(24, DB::table('activities')
             ->where('section_id', $sectionId)
             ->where('subject_id', $subjectId)
@@ -124,5 +135,38 @@ class AdminTeacherAssignmentTest extends TestCase
         Sanctum::actingAs(User::factory()->create(['role' => 'teacher', 'active' => true]));
 
         $this->getJson('/api/admin/teacher-assignments')->assertForbidden();
+    }
+
+    public function test_admin_can_assign_one_teacher_to_many_courses_atomically(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'active' => true]);
+        $teacher = User::factory()->create(['role' => 'teacher', 'active' => true]);
+        Sanctum::actingAs($admin);
+        $year = DB::table('academic_years')->insertGetId(['name' => '2028-2029', 'start_date' => '2028-08-01', 'end_date' => '2029-06-30']);
+        DB::table('periods')->insert(['academic_year_id' => $year, 'number' => 1, 'name' => 'P1', 'months' => 'Ago-Oct', 'start_date' => '2028-08-01', 'end_date' => '2028-10-31']);
+        $grade = DB::table('grades')->insertGetId(['name' => '1ro', 'level' => 'Primaria', 'sort_order' => 1]);
+        $section = DB::table('sections')->insertGetId(['grade_id' => $grade, 'academic_year_id' => $year, 'name' => 'A', 'shift' => 'Matutina']);
+        $courseIds = collect(['MAT' => 'Matemática', 'ROB' => 'Robótica', 'LEN' => 'Lengua'])->map(function ($name, $code) use ($section) {
+            $subject = DB::table('subjects')->insertGetId(['name' => $name, 'code' => $code, 'active' => true]);
+
+            return DB::table('course_offerings')->insertGetId(['section_id' => $section, 'subject_id' => $subject, 'active' => true]);
+        })->values()->all();
+
+        $this->postJson('/api/admin/teacher-assignments', [
+            'teacher_id' => $teacher->id, 'course_offering_ids' => $courseIds,
+        ])->assertCreated()->assertJsonPath('assigned_count', 3)->assertJsonCount(3, 'assignments');
+        $this->assertSame(3, DB::table('teacher_assignments')->where('teacher_id', $teacher->id)->where('active', true)->count());
+        $this->assertSame(18, DB::table('course_activities')->count());
+
+        $this->postJson('/api/admin/teacher-assignments', [
+            'teacher_id' => $teacher->id, 'course_offering_ids' => [$courseIds[0], 999999],
+        ])->assertUnprocessable();
+        $this->assertSame(3, DB::table('teacher_assignments')->where('teacher_id', $teacher->id)->count());
+
+        $assignmentId = DB::table('teacher_assignments')->where('teacher_id', $teacher->id)->where('course_offering_id', $courseIds[0])->value('id');
+        $this->deleteJson("/api/admin/teacher-assignments/{$assignmentId}")->assertOk()
+            ->assertJsonPath('message', 'Asignación docente eliminada correctamente.');
+        $this->assertDatabaseMissing('teacher_assignments', ['id' => $assignmentId]);
+        $this->assertSame(18, DB::table('course_activities')->count());
     }
 }

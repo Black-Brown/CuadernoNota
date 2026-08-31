@@ -12,6 +12,20 @@ import RiskOverview from './pages/docente/RiskOverview.jsx';
 import RiskCourse from './pages/docente/RiskCourse.jsx';
 import RiskStudent from './pages/docente/RiskStudent.jsx';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminLayout from './components/AdminLayout.jsx';
+import AdminDashboard from './pages/admin/Dashboard.jsx';
+import AdminUsers from './pages/admin/Users.jsx';
+import AdminStudents from './pages/admin/Students.jsx';
+import AdminStudentProfile from './pages/admin/StudentProfile.jsx';
+import AdminCatalog from './pages/admin/Catalog.jsx';
+import AdminInstitutional from './pages/admin/Institutional.jsx';
+import AdminAssignments from './pages/admin/Assignments.jsx';
+import AdminGradeReviews from './pages/admin/GradeReviews.jsx';
+import AdminGradeReviewDetail from './pages/admin/GradeReviewDetail.jsx';
+import AdminPromotions from './pages/admin/Promotions.jsx';
+import AdminReports from './pages/admin/Reports.jsx';
+import AdminAudit from './pages/admin/Audit.jsx';
+import AdminSystem from './pages/admin/System.jsx';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +43,23 @@ export default function App() {
 
           {/* Pública */}
           <Route path="/login" element={<Login />} />
+
+          <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminLayout /></ProtectedRoute>}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="students" element={<AdminStudents />} />
+            <Route path="students/:id" element={<AdminStudentProfile />} />
+            <Route path="catalog" element={<AdminCatalog />} />
+            <Route path="institutional" element={<AdminInstitutional />} />
+            <Route path="assignments" element={<AdminAssignments />} />
+            <Route path="reviews" element={<AdminGradeReviews />} />
+            <Route path="reviews/:sectionId/:subjectId/:periodId" element={<AdminGradeReviewDetail />} />
+            <Route path="promotions" element={<AdminPromotions />} />
+            <Route path="reports" element={<AdminReports />} />
+            <Route path="audit" element={<AdminAudit />} />
+            <Route path="system" element={<AdminSystem />} />
+          </Route>
 
           {/* Protegidas: Docente */}
           <Route

@@ -3,6 +3,7 @@
 namespace App\Application\Activity;
 
 use App\Infrastructure\Models\CourseOffering;
+use App\Infrastructure\Models\ActivityTemplate;
 use Illuminate\Support\Facades\DB;
 
 class EnsureDefaultCourseActivities
@@ -22,6 +23,12 @@ class EnsureDefaultCourseActivities
 
         if (!$offering->section) {
             return;
+        }
+
+        // Recover missing defaults during initial setup without modifying existing
+        // templates. System resets preserve this catalog and its identifiers.
+        foreach (self::NAMES as $name) {
+            ActivityTemplate::firstOrCreate(['name' => $name], ['icon' => 'assignment', 'active' => true]);
         }
 
         $periodIds = DB::table('periods')
