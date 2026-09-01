@@ -81,6 +81,7 @@ class RegisterRecovery
             periodScore: $existing->periodScore,
             rpScore:     $rpScore,
             status:      $existing->status,
+            sectionId:   $existing->sectionId,
         );
 
         $this->periodGradeRepo->upsert($withRp);

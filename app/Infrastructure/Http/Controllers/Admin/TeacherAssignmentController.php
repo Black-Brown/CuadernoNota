@@ -39,6 +39,7 @@ class TeacherAssignmentController extends Controller
                     'subjects.id as subject_id',
                     'grades.name as grade_name',
                     'sections.name as section_name',
+                    'sections.shift',
                     'subjects.name as subject_name',
                     'academic_years.name as academic_year_name',
                 ]),
@@ -79,29 +80,47 @@ class TeacherAssignmentController extends Controller
     {
         $data = $request->validate([
             'teacher_id' => ['required', 'integer', 'exists:users,id'],
-            'course_offering_id' => ['required', 'integer', 'exists:course_offerings,id'],
+            'course_offering_id' => ['required_without:course_offering_ids', 'integer', 'exists:course_offerings,id'],
+            'course_offering_ids' => ['required_without:course_offering_id', 'array', 'min:1', 'max:100'],
+            'course_offering_ids.*' => ['integer', 'distinct', 'exists:course_offerings,id'],
         ]);
 
         $teacher = User::findOrFail($data['teacher_id']);
-        if ($teacher->role !== 'teacher' || !$teacher->active) {
+        if ($teacher->role !== 'teacher' || ! $teacher->active) {
             throw ValidationException::withMessages([
                 'teacher_id' => 'El usuario debe ser un profesor activo.',
             ]);
         }
 
-        $assignment = TeacherAssignment::updateOrCreate(
-            [
-                'teacher_id' => $teacher->id,
-                'course_offering_id' => $data['course_offering_id'],
-            ],
-            [
-                'assigned_by' => $request->user()->id,
-                'assigned_at' => now(),
-                'active' => true,
-            ]
-        );
+        $courseIds = collect($data['course_offering_ids'] ?? [$data['course_offering_id']])->map(fn ($id) => (int) $id)->unique()->values();
+        $assignments = DB::transaction(function () use ($teacher, $courseIds, $request) {
+            $activeCourseIds = DB::table('course_offerings')->whereIn('id', $courseIds)->where('active', true)->lockForUpdate()->pluck('id');
+            if ($activeCourseIds->count() !== $courseIds->count()) {
+                throw ValidationException::withMessages(['course_offering_ids' => 'Todos los cursos seleccionados deben estar activos.']);
+            }
+            $result = collect();
+            foreach ($courseIds as $courseId) {
+                $result->push(TeacherAssignment::updateOrCreate(
+                    ['teacher_id' => $teacher->id, 'course_offering_id' => $courseId],
+                    ['assigned_by' => $request->user()->id, 'assigned_at' => now(), 'active' => true]
+                ));
+            }
 
-        return response()->json($assignment->fresh(), 201);
+            return $result;
+        });
+
+        // Preserve the original one-course response contract for existing clients.
+        if (! isset($data['course_offering_ids'])) {
+            return response()->json($assignments->first()->fresh(), 201);
+        }
+
+        return response()->json([
+            'message' => $assignments->count().' cursos asignados correctamente.',
+            'assigned_count' => $assignments->count(),
+            'assignments' => TeacherAssignment::query()->whereIn('id', $assignments->pluck('id'))
+                ->with(['teacher:id,name,email', 'courseOffering.section.grade', 'courseOffering.section.academicYear', 'courseOffering.subject'])
+                ->get(),
+        ], 201);
     }
 
     public function update(Request $request, TeacherAssignment $teacherAssignment): JsonResponse
@@ -119,6 +138,28 @@ class TeacherAssignmentController extends Controller
             'active' => ['sometimes', 'boolean'],
         ]);
 
+        $teacher = $teacherAssignment->teacher;
+        if (($data['active'] ?? $teacherAssignment->active) && ($teacher->role !== 'teacher' || ! $teacher->active)) {
+            throw ValidationException::withMessages([
+                'active' => 'No se puede activar una asignación de un profesor inactivo.',
+            ]);
+        }
+
+        if (isset($data['course_offering_id'])) {
+            $courseIsActive = DB::table('course_offerings')
+                ->join('subjects', 'subjects.id', '=', 'course_offerings.subject_id')
+                ->where('course_offerings.id', $data['course_offering_id'])
+                ->where('course_offerings.active', true)
+                ->where('subjects.active', true)
+                ->exists();
+
+            if (! $courseIsActive) {
+                throw ValidationException::withMessages([
+                    'course_offering_id' => 'El curso seleccionado debe estar activo.',
+                ]);
+            }
+        }
+
         $teacherAssignment->update($data);
 
         return response()->json($teacherAssignment->fresh());
@@ -126,8 +167,8 @@ class TeacherAssignmentController extends Controller
 
     public function destroy(TeacherAssignment $teacherAssignment): JsonResponse
     {
-        $teacherAssignment->update(['active' => false]);
+        $teacherAssignment->delete();
 
-        return response()->json(['message' => 'Asignación docente desactivada correctamente.']);
+        return response()->json(['message' => 'Asignación docente eliminada correctamente.']);
     }
 }

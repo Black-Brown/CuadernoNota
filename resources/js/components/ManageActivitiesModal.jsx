@@ -3,16 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getActivitiesBySubject } from '../api/grades.api';
 import { createActivity, updateActivity } from '../api/activities.api';
 
-// Icon / color map for known base activities
-const ICON_MAP = {
-  'Proyectos':          { icon: 'account_tree', color: 'bg-blue-50 text-blue-600' },
-  'Examen':             { icon: 'assignment',   color: 'bg-purple-50 text-purple-600' },
-  'Tareas':             { icon: 'edit_note',    color: 'bg-amber-50 text-amber-600' },
-  'Ensayo':             { icon: 'article',      color: 'bg-rose-50 text-rose-600' },
-  'Producción en aula': { icon: 'school',       color: 'bg-teal-50 text-teal-600' },
-  'Diagnósticas':       { icon: 'fact_check',   color: 'bg-emerald-50 text-emerald-600' },
-};
-const DEFAULT_META = { icon: 'add_task', color: 'bg-slate-50 text-slate-600' };
+import { BASE_ACTIVITY_PRESENTATION, getActivityPresentation } from '../utils/activityPresentation';
 
 const ACTIVITY_TYPES = [
   { value: 'proyecto',        label: 'Proyecto' },
@@ -261,8 +252,8 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
                   )}
 
                   {activities.map((act, idx) => {
-                    const meta      = ICON_MAP[act.name] ?? DEFAULT_META;
-                    const isBase    = !!ICON_MAP[act.name];
+                    const meta      = getActivityPresentation(act);
+                    const isBase    = Object.hasOwn(BASE_ACTIVITY_PRESENTATION, act.name);
                     const isEditing = editingId === act.id;
 
                     return (
@@ -295,7 +286,7 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
                           ) : (
                             <div className="flex items-center gap-3">
                               <div className={`p-2 rounded-lg ${meta.color}`}>
-                                <span className="material-symbols-outlined text-[18px]">{act.icon ?? meta.icon}</span>
+                                <span className="material-symbols-outlined text-[18px]">{meta.icon}</span>
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold text-slate-800">{act.name}</span>
@@ -338,8 +329,8 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
                         <td className="px-6 py-3.5 text-right">
                           <button
                             onClick={() => { setEditingId(act.id); setEditingName(act.name); }}
-                            disabled={!act.active || isEditing || !canEditActivities}
-                            title="Renombrar"
+                            disabled={!act.active || isEditing || !canEditActivities || isBase}
+                            title={isBase ? 'Las actividades base conservan su nombre institucional' : 'Renombrar'}
                             className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span>

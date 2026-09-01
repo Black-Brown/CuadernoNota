@@ -12,7 +12,7 @@ class RoleMiddleware
     {
         $user = auth()->user();
 
-        if (!$user || !in_array($user->role, $roles, true)) {
+        if (! $user || ! $user->active || ! in_array($user->role, $roles, true)) {
             return response()->json([
                 'message' => 'No tienes permisos para acceder a este recurso.',
             ], 403);

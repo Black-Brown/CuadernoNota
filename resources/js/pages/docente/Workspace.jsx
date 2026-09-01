@@ -9,6 +9,7 @@ import DashboardLayout from '../../components/DashboardLayout';
 import ManageActivitiesModal from '../../components/ManageActivitiesModal';
 import usePeriodStore from '../../store/periodStore';
 import { downloadCsv, safeFilename } from '../../utils/exportCsv';
+import { BASE_ACTIVITY_PRESENTATION } from '../../utils/activityPresentation';
 
 export default function Workspace() {
   const { sectionId, subjectId } = useParams();
@@ -127,32 +128,7 @@ export default function Workspace() {
     });
   }, [queryClient, subjectId, period?.id, sectionId]);
 
-  const activityMeta = {
-    Proyectos: {
-      icon: 'account_tree',
-      desc: 'Evaluación basada en competencias colaborativas.',
-    },
-    Examen: {
-      icon: 'assignment',
-      desc: 'Pruebas sumativas periódicas.',
-    },
-    Tareas: {
-      icon: 'edit_note',
-      desc: 'Seguimiento de trabajo autónomo.',
-    },
-    Ensayo: {
-      icon: 'article',
-      desc: 'Análisis crítico y redacción científica.',
-    },
-    'Producción en aula': {
-      icon: 'school',
-      desc: 'Evidencias de trabajo diario y participación.',
-    },
-    Diagnósticas: {
-      icon: 'fact_check',
-      desc: 'Evaluación inicial de conocimientos previos.',
-    },
-  };
+  const activityMeta = BASE_ACTIVITY_PRESENTATION;
 
   const groupAvg = subjectStats?.group_avg ?? 80.5;
   const atRiskCount = subjectStats?.at_risk_count ?? 12;

@@ -1,11 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
-
-const roleDefaults = {
-  teacher:     '/docente/dashboard',
-  coordinator: '/coordinador/dashboard',
-  admin:       '/admin/dashboard',
-};
+import { routeForRole } from '../utils/adminAccess';
 
 export default function ProtectedRoute({ children, allowedRoles }) {
   const { token, user } = useAuthStore();
@@ -15,7 +10,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    const fallback = roleDefaults[user.role] || '/login';
+    const fallback = routeForRole(user.role);
     return <Navigate to={fallback} replace />;
   }
 

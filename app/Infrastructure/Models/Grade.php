@@ -9,10 +9,11 @@ class Grade extends Model
 {
     protected $table = 'grades';
 
-    protected $fillable = ['name', 'level', 'sort_order'];
+    protected $fillable = ['name', 'level', 'sort_order', 'active'];
 
     protected $casts = [
         'sort_order' => 'integer',
+        'active' => 'boolean',
     ];
 
     public function sections(): HasMany

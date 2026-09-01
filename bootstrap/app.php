@@ -1,6 +1,7 @@
 <?php
 
 use App\Infrastructure\Http\Middleware\RoleMiddleware;
+use App\Infrastructure\Http\Middleware\AuditAdminAction;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trimStrings(except: ['confirmation']);
         $middleware->trustProxies(
             at: '*',
             headers: \Illuminate\Http\Request::HEADER_X_FORWARDED_FOR |
@@ -23,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         );
         $middleware->alias([
             'role' => RoleMiddleware::class,
+            'audit.admin' => AuditAdminAction::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

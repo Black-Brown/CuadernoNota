@@ -436,8 +436,7 @@ class RiskController extends Controller
     private function groupAverage(int $sectionId, int $subjectId, int $periodId): ?float
     {
         $avg = DB::table('period_grades')
-            ->join('students', 'period_grades.student_id', '=', 'students.id')
-            ->where('students.section_id', $sectionId)
+            ->where('period_grades.section_id', $sectionId)
             ->where('period_grades.subject_id', $subjectId)
             ->where('period_grades.period_id', $periodId)
             ->selectRaw('AVG(COALESCE(period_grades.rp_score, period_grades.period_score)) as avg_score')
