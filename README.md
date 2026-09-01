@@ -1,29 +1,48 @@
 # Cuaderno Nota
 
-Cuaderno Nota es una aplicación web de gestión académica diseñada para facilitar el trabajo diario de los docentes. Permite administrar cursos, actividades, calificaciones, asistencia, observaciones y alertas de riesgo estudiantil desde un mismo espacio.
+Cuaderno Nota es una aplicación web de gestión académica institucional. Permite administrar años escolares, grados, secciones, materias, actividades, calificaciones, asistencia, observaciones y alertas de riesgo estudiantil, con paneles diferenciados para docentes y administradores.
 
-El sistema organiza la información por año escolar, grado, sección, asignatura y período académico. Cada docente solo puede consultar o modificar los cursos que tiene asignados.
+El proyecto está organizado como un **monorepo con frontend y API separados**: React/Vite por un lado, Laravel por otro, comunicados exclusivamente vía API REST con tokens Bearer (sin cookies ni sesiones compartidas), pensado para desplegarse en dominios distintos.
 
-## Funcionalidades principales
+## Estructura del repositorio
 
-- Autenticación mediante tokens con Laravel Sanctum.
-- Panel general del docente con indicadores académicos.
-- Consulta de cursos, secciones y asignaturas asignadas.
-- Gestión de actividades por curso y período.
-- Registro de calificaciones por estudiante, actividad y competencia.
-- Cálculo automático de competencias y notas por período.
-- Libro de calificaciones con los cuatro períodos y calificación final.
+```text
+CuadernoNota/
+├── api/           Backend Laravel (API REST)
+├── frontend/       Frontend React + Vite
+├── compose.yaml    Orquestación de todo el stack para desarrollo local
+└── docs/
+```
+
+## Módulos
+
+### Docente
+
+- Panel con indicadores académicos del profesor.
+- Cursos, secciones y asignaturas asignadas.
+- Actividades por curso y período; calificación por estudiante, actividad y competencia.
+- Libro de calificaciones (los cuatro períodos + calificación final).
 - Envío de calificaciones a revisión y bloqueo de espacios cerrados.
-- Registro de recuperación pedagógica, final y especial.
+- Recuperación pedagógica, final y especial.
 - Registro de asistencia y justificación de ausencias.
 - Observaciones académicas, disciplinarias e incidentes.
-- Identificación de estudiantes con riesgo académico o de asistencia.
-- Exportación de información académica en formato CSV.
-- Control de acceso según el docente, la sección y el año académico.
+- Identificación de estudiantes en riesgo académico o de asistencia.
+
+### Administración
+
+- Dashboard administrativo.
+- Gestión de usuarios y roles.
+- Gestión de estudiantes: alta, matrícula, importación por CSV, colocación de estudiantes pendientes, desactivación.
+- Revisión y aprobación/rechazo de calificaciones por sección, materia y período.
+- Promoción de estudiantes (individual y masiva) con historial de decisiones.
+- Catálogo académico: años escolares, períodos, grados, secciones, materias, plantillas de actividades.
+- Asignaciones docentes.
+- Reportes académicos y de asistencia; auditoría de acciones (`audit_logs`); respaldos.
+- Restablecimiento controlado de datos del sistema, con vista previa, verificación de integridad y confirmación explícita — conserva usuarios, años escolares y períodos.
 
 ## Reglas de calificación
 
-Las actividades se registran bajo una de las tres competencias del sistema:
+Las actividades se registran bajo una de tres competencias:
 
 - C1: Competencia comunicativa.
 - C2: Pensamiento lógico, creativo y crítico.
@@ -39,11 +58,45 @@ Calificación final = promedio de las notas efectivas de los 4 períodos
 
 Cuando existe una recuperación pedagógica, esta sustituye la nota ordinaria del período para calcular la calificación final.
 
+## Arquitectura
+
+### Backend (`api/`)
+
+Separa las reglas de negocio de los detalles de Laravel siguiendo una estructura inspirada en Domain-Driven Design y arquitectura limpia:
+
+```text
+api/app/
+├── Domain/          Entidades, reglas de negocio y contratos (interfaces de repositorio)
+├── Application/      Casos de uso del sistema
+└── Infrastructure/   Controladores HTTP, modelos Eloquent y repositorios
+```
+
+Recorrido habitual de una solicitud:
+
+```text
+React → API Laravel → Controller → Caso de uso → Repositorio → Base de datos
+                                        ↓
+                                Servicio de dominio
+```
+
+Autenticación por token con Laravel Sanctum (Bearer, sin cookies) — necesario porque frontend y API viven en dominios distintos en producción.
+
+### Frontend (`frontend/`)
+
+```text
+frontend/src/
+├── api/             Cliente Axios y funciones de acceso a la API
+├── components/       Componentes reutilizables (incluye admin/ y ui/)
+├── pages/            Pantallas: auth/, docente/, admin/
+├── store/            Estado global con Zustand
+└── utils/            Utilidades
+```
+
 ## Tecnologías
 
 ### Backend
 
-- PHP 8.3
+- PHP 8.4
 - Laravel 13
 - Laravel Sanctum
 - Eloquent ORM
@@ -61,231 +114,146 @@ Cuando existe una recuperación pedagógica, esta sustituye la nota ordinaria de
 
 ### Base de datos
 
-Laravel permite utilizar SQLite, MySQL, MariaDB o PostgreSQL. La configuración predeterminada del proyecto utiliza SQLite.
+PostgreSQL es la base de datos objetivo (Docker local y Supabase en producción). SQLite se usa únicamente para la suite de pruebas automatizadas por velocidad.
 
-## Arquitectura
+## Desarrollo local con Docker (recomendado)
 
-El backend separa las reglas de negocio de los detalles de Laravel siguiendo una estructura inspirada en Domain-Driven Design y arquitectura limpia:
-
-```text
-app/
-├── Domain/          Entidades, reglas de negocio y contratos
-├── Application/     Casos de uso del sistema
-└── Infrastructure/  Controladores, modelos Eloquent y repositorios
-
-resources/js/
-├── api/             Cliente y funciones de acceso a la API
-├── components/      Componentes reutilizables
-├── pages/           Pantallas de autenticación y del docente
-├── store/           Estado global con Zustand
-└── utils/           Utilidades del frontend
-```
-
-El recorrido habitual de una solicitud es:
-
-```text
-React → API Laravel → Controller → Caso de uso → Repositorio → Base de datos
-                                      ↓
-                              Servicio de dominio
-```
-
-## Requisitos
-
-- PHP 8.3 o superior con las extensiones habituales de Laravel.
-- Composer 2.
-- Node.js 20 o superior y npm.
-- Git.
-- SQLite, MySQL, MariaDB o PostgreSQL.
-
-En Windows se puede utilizar Laragon para instalar PHP, Composer y MySQL de manera sencilla.
-
-## Instalación
-
-### 1. Clonar el repositorio
+Requiere Docker Desktop.
 
 ```bash
 git clone https://github.com/Black-Brown/CuadernoNota.git
 cd CuadernoNota
+docker compose up -d --build
 ```
 
-### 2. Instalar las dependencias
+Esto levanta tres servicios:
+
+| Servicio   | URL                         | Descripción                          |
+|------------|------------------------------|---------------------------------------|
+| `db`        | `localhost:5433`             | PostgreSQL 16                         |
+| `api`       | http://localhost:8000        | API Laravel                           |
+| `frontend`  | http://localhost:5173        | React + Vite (hot reload)             |
+
+Al iniciar, el contenedor de la API genera `.env` desde `.env.example` si no existe, corre las migraciones automáticamente y limpia cachés.
+
+Carga datos de prueba:
 
 ```bash
-composer install
-npm install
+docker compose exec api php artisan db:seed --force
 ```
 
-### 3. Configurar el entorno
-
-Crea un archivo `.env` en la raíz. Para utilizar SQLite puedes comenzar con esta configuración mínima:
-
-```env
-APP_NAME="Cuaderno Nota"
-APP_ENV=local
-APP_KEY=
-APP_DEBUG=true
-APP_URL=http://localhost:8000
-
-DB_CONNECTION=sqlite
-
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=http://localhost:8000/api/auth/google/callback
-GOOGLE_WORKSPACE_DOMAIN=happylearningschool.net
-FRONTEND_URL=http://localhost:8000
-```
-
-Crea el archivo de base de datos y genera la clave de la aplicación:
-
-```bash
-php -r "file_exists('database/database.sqlite') || touch('database/database.sqlite');"
-php artisan key:generate
-```
-
-En Windows también puedes crear manualmente el archivo vacío `database/database.sqlite`.
-
-### 4. Ejecutar migraciones y datos de prueba
-
-```bash
-php artisan migrate
-php artisan db:seed
-```
-
-El seeder principal carga competencias, cursos, estudiantes y otros datos demostrativos. Si solo quieres el conjunto mínimo de demostración, ejecuta:
-
-```bash
-php artisan db:seed --class=DemoSeeder
-```
-
-### 5. Iniciar el entorno de desarrollo
-
-```bash
-composer run dev
-```
-
-También puedes iniciar cada servidor por separado:
-
-```bash
-php artisan serve
-npm run dev
-```
-
-La aplicación estará disponible normalmente en [http://localhost:8000](http://localhost:8000).
-
-## Configuración con MySQL
-
-Crea una base de datos llamada `cuaderno_nota` y utiliza una configuración similar:
-
-```env
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=cuaderno_nota
-DB_USERNAME=root
-DB_PASSWORD=
-```
-
-Después ejecuta:
-
-```bash
-php artisan migrate --seed
-```
-
-## Usuario de demostración
-
-Después de ejecutar `DemoSeeder` puedes iniciar sesión con:
+Abre **http://localhost:5173** (usa `localhost`, no `127.0.0.1`: el origen debe coincidir exactamente con `CORS_ALLOWED_ORIGINS` en `compose.yaml`) e inicia sesión con:
 
 ```text
 Correo: docente@demo.com
 Contraseña: password
 ```
 
-Estas credenciales son exclusivamente para desarrollo. Deben cambiarse o eliminarse antes de publicar el sistema.
-
-## Comandos útiles
+Comandos útiles:
 
 ```bash
-# Iniciar backend, frontend, cola y visor de logs
-composer run dev
-
-# Ejecutar pruebas
-composer test
-
-# Aplicar el formato de Laravel
-./vendor/bin/pint
-
-# Compilar el frontend para producción
-npm run build
-
-# Limpiar las cachés de Laravel
-php artisan optimize:clear
-
-# Reconstruir la base de datos con datos de prueba
-php artisan migrate:fresh --seed
+docker compose ps                # estado de los servicios
+docker compose logs -f api        # logs en vivo
+docker compose down               # apagar (conserva los datos en el volumen)
+docker compose up -d --build api  # reconstruir tras cambiar composer.json o api/Dockerfile
+docker compose up -d --build frontend  # reconstruir tras cambiar package.json o frontend/Dockerfile
 ```
 
-El último comando elimina todos los datos existentes. Úsalo únicamente en un entorno de desarrollo.
+Editar código dentro de `api/` o `frontend/` no requiere reconstruir: ambos directorios están montados como volumen.
 
-## API y seguridad
+## Desarrollo local sin Docker
 
-Las rutas de la API se encuentran bajo `/api`. Las operaciones del módulo docente requieren:
+### Backend
 
-- Un token válido de Laravel Sanctum.
-- Una cuenta activa con el rol `teacher`.
-- Una asignación válida al curso, sección y año académico solicitado.
+```bash
+cd api
+composer install
+cp .env.example .env
+php artisan key:generate
+```
 
-El backend valida estas condiciones aunque la interfaz o una solicitud externa intente enviar identificadores de otro curso.
+Por defecto `.env.example` apunta a PostgreSQL con host `db` (el nombre del servicio en Docker). Para correr fuera de Docker, cambia `DB_HOST`/`DB_PORT` a tu instancia local de Postgres, o usa SQLite:
 
-## Acceso con Google Workspace
+```env
+DB_CONNECTION=sqlite
+```
 
-El inicio de sesión con Google está restringido a cuentas institucionales administradas bajo `happylearningschool.net`. El usuario también debe existir previamente en Cuaderno Nota y mantener su cuenta activa; Google autentica su identidad, pero no asigna roles ni cursos automáticamente.
+```bash
+php artisan migrate --seed
+php artisan serve
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+## Pruebas
+
+La suite corre contra SQLite en memoria (configurado en `api/phpunit.xml`) por velocidad:
+
+```bash
+cd api
+php artisan test
+```
+
+Si necesitas verificar compatibilidad con PostgreSQL, apunta las pruebas a una **base de datos separada** (nunca a la de desarrollo — `RefreshDatabase` ejecuta `migrate:fresh` y borra todo lo que tengas sembrado):
+
+```bash
+DB_CONNECTION=pgsql DB_DATABASE=cuaderno_nota_test DB_HOST=127.0.0.1 DB_PORT=5433 php artisan test
+```
+
+## Autenticación
+
+### Correo y contraseña
+
+Login clásico contra `/api/auth/login`, devuelve un token Sanctum que el frontend guarda y envía como `Authorization: Bearer`.
+
+### Google Workspace
+
+Restringido a cuentas institucionales del dominio configurado en `GOOGLE_WORKSPACE_DOMAIN`. El usuario debe existir previamente en Cuaderno Nota y estar activo — Google solo autentica la identidad, no asigna roles ni cursos.
+
+Como frontend y API están en dominios distintos, el flujo no usa cookies: la API redirige a Google, valida el callback, genera un código de un solo uso y el frontend lo intercambia por un token Sanctum vía `POST /api/auth/google/exchange`.
 
 Para habilitarlo:
 
 1. Crea un cliente OAuth 2.0 de tipo **Aplicación web** en Google Cloud Console.
-2. Registra `http://localhost:8000/api/auth/google/callback` como URI de redirección durante el desarrollo.
-3. Completa las variables `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` del archivo `.env`.
-4. Ejecuta las migraciones para agregar la identidad de Google a los usuarios.
+2. Registra la URI de callback de la API como URI de redirección autorizada (`GOOGLE_REDIRECT_URI`, p. ej. `http://localhost:8000/api/auth/google/callback` en desarrollo).
+3. Completa `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` en `api/.env`.
+4. Asegúrate de que `FRONTEND_URL` apunte al origen real del frontend (a donde se redirige tras el login).
 
-En producción, reemplaza las URLs locales por el dominio HTTPS definitivo y registra exactamente la misma URI en Google Cloud Console.
+## Despliegue en producción
 
-## Pruebas
+Objetivo: **frontend en Vercel, API en Render/Railway (o un servidor PHP propio), base de datos en Supabase**.
 
-Las pruebas cubren reglas importantes del dominio:
+### Base de datos (Supabase)
 
-- Cálculo de competencias.
-- Cálculo de notas por período.
-- Cálculo de la calificación final.
-- Alertas por ausencias consecutivas.
-- Porcentaje mínimo de asistencia anual.
+1. Crea el proyecto y toma la cadena de conexión de Postgres.
+2. En las variables de entorno de la API: `DB_CONNECTION=pgsql`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` de Supabase, y `DB_SSLMODE=require` (Supabase exige SSL).
 
-Para ejecutarlas:
+### API (Render, Railway o servidor PHP)
 
-```bash
-composer test
-```
+1. Configura **todas** las variables de `api/.env.example` como variables de entorno reales de la plataforma (no subas un `.env` con secretos al repositorio).
+2. `APP_ENV=production`, `APP_DEBUG=false`, `APP_KEY` generado con `php artisan key:generate --show`.
+3. `APP_URL` con el dominio real de la API; `FRONTEND_URL` y `CORS_ALLOWED_ORIGINS` con el dominio real de Vercel (deben coincidir exactamente, incluyendo `https://` y sin barra final).
+4. `GOOGLE_REDIRECT_URI` con la URI de callback de producción, registrada también en Google Cloud Console.
+5. Si despliegas con el `Dockerfile` de `api/`: su `CMD` invoca el servidor embebido de PHP directamente (no `php artisan serve`, que descarta variables de entorno reales en favor de `.env` — ver comentario en el `Dockerfile`). Aun así, el servidor embebido de PHP no es apto para tráfico de producción alto según la propia documentación de PHP; si la plataforma ofrece un runtime nativo de PHP (PHP-FPM + Nginx), suele ser preferible a este `Dockerfile`.
+6. Ejecuta migraciones (`php artisan migrate --force`) como parte del despliegue.
 
-## Preparación para producción
+### Frontend (Vercel)
 
-Antes de publicar el sistema:
-
-1. Configura `APP_ENV=production` y `APP_DEBUG=false`.
-2. Utiliza credenciales de base de datos seguras.
-3. Elimina o cambia los usuarios y contraseñas de demostración.
-4. Configura correo, colas, logs y copias de seguridad.
-5. Ejecuta las migraciones y compila el frontend.
-
-```bash
-php artisan migrate --force
-npm ci
-npm run build
-php artisan optimize
-```
+1. Root directory del proyecto: `frontend/`.
+2. Build command: `npm run build`. Output: `dist/`.
+3. Variable de entorno `VITE_API_URL` apuntando a la URL pública de la API (p. ej. `https://api.tudominio.com/api`).
 
 ## Estado del proyecto
 
-Actualmente está implementado el módulo académico del docente. La arquitectura y el modelo de datos permiten incorporar posteriormente módulos administrativos, coordinación académica, dirección y reportes institucionales.
+Implementados los módulos de docente y administración. El modelo de datos permite incorporar posteriormente coordinación académica, dirección y reportes institucionales adicionales.
 
 ## Licencia
 
-Este proyecto utiliza la licencia MIT definida en `composer.json`.
+Este proyecto utiliza la licencia MIT definida en `api/composer.json`.
