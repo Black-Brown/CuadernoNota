@@ -232,12 +232,14 @@ Objetivo: **frontend en Vercel, API en Render/Railway (o un servidor PHP propio)
 
 ### Base de datos (Supabase)
 
-1. Crea el proyecto y toma la cadena de conexión de Postgres.
-2. En las variables de entorno de la API: `DB_CONNECTION=pgsql`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` de Supabase, y `DB_SSLMODE=require` (Supabase exige SSL).
+1. Crea el proyecto y abre **Connect > Session pooler**. Para Render usa esta conexión IPv4 en el puerto `5432`; el host directo `db.<project>.supabase.co` normalmente requiere IPv6.
+2. Copia la cadena completa en Render como `DATABASE_URL` (también se admite `DB_URL`) y agrega `DB_CONNECTION=pgsql` y `DB_SSLMODE=require`.
+3. Como alternativa, configura por separado `DB_HOST`, `DB_PORT=5432`, `DB_DATABASE=postgres`, `DB_USERNAME=postgres.<project-ref>` y `DB_PASSWORD`. Esta opción evita tener que codificar caracteres especiales de la contraseña dentro de una URL.
 
 ### API (Render, Railway o servidor PHP)
 
 1. Configura **todas** las variables de `api/.env.example` como variables de entorno reales de la plataforma (no subas un `.env` con secretos al repositorio).
+   En Render, establece Root Directory en `api` y usa el `Dockerfile` ubicado en esa carpeta.
 2. `APP_ENV=production`, `APP_DEBUG=false`, `APP_KEY` generado con `php artisan key:generate --show`.
 3. `APP_URL` con el dominio real de la API; `FRONTEND_URL` y `CORS_ALLOWED_ORIGINS` con el dominio real de Vercel (deben coincidir exactamente, incluyendo `https://` y sin barra final).
 4. `GOOGLE_REDIRECT_URI` con la URI de callback de producción, registrada también en Google Cloud Console.
