@@ -86,7 +86,9 @@ return [
 
         'pgsql' => [
             'driver' => 'pgsql',
-            'url' => env('DB_URL'),
+            // Laravel traditionally reads DB_URL. Render and other hosts commonly
+            // expose DATABASE_URL, so accept either name without duplicating secrets.
+            'url' => env('DB_URL', env('DATABASE_URL')),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
             'database' => env('DB_DATABASE', 'laravel'),
