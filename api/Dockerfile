@@ -31,4 +31,5 @@ ENTRYPOINT ["docker/entrypoint.sh"]
 # injected by Docker Compose or a host like Render/Railway with whatever is in .env (or .env.example
 # if no .env ships). Run the built-in server directly with Laravel's own router instead, which
 # inherits the real process environment like any other PHP process.
-CMD ["sh", "-c", "cd public && exec php -S 0.0.0.0:8000 ../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"]
+# $PORT is honored because Render/Railway assign it dynamically; 8000 is the local/Compose default.
+CMD ["sh", "-c", "cd public && exec php -S 0.0.0.0:${PORT:-8000} ../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"]

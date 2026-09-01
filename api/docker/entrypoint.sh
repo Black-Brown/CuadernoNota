@@ -9,7 +9,9 @@ if [ ! -f vendor/autoload.php ]; then
     composer install --no-interaction --prefer-dist
 fi
 
-if ! grep -Eq '^APP_KEY=base64:.+' .env; then
+# A real APP_KEY env var (e.g. set on Render/Railway) always wins over .env and makes
+# `artisan key:generate` refuse to run, so only generate one when APP_KEY is unset everywhere.
+if [ -z "${APP_KEY:-}" ] && ! grep -Eq '^APP_KEY=base64:.+' .env; then
     php artisan key:generate --force
 fi
 
