@@ -50,9 +50,9 @@ class UpdateToExcuse
             );
         }
 
-        if ($record->isPresent()) {
+        if ($record->countsAsAttendance()) {
             throw new RuntimeException(
-                "No se puede justificar un registro que ya está marcado como presente."
+                "No se puede justificar un registro marcado como presente o tardanza."
             );
         }
 

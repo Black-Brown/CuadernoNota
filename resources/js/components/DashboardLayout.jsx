@@ -85,9 +85,9 @@ export default function DashboardLayout({ children }) {
             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">·</span>
             <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{period.months}</span>
             <span className={`ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-              period.status === 'open' ? 'bg-emerald-50 text-emerald-600' : period.status === 'in_review' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'
+              period.status === 'open' ? 'bg-emerald-50 text-emerald-600' : period.status === 'in_review' ? 'bg-amber-50 text-amber-600' : period.status === 'upcoming' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-500'
             }`}>
-              {period.status === 'open' ? 'Activo' : period.status === 'in_review' ? 'En revisión' : 'Cerrado'}
+              {period.status === 'open' ? 'Activo' : period.status === 'in_review' ? 'En revisión' : period.status === 'upcoming' ? 'Próximo' : period.status === 'ended' ? 'Finalizado' : 'Cerrado'}
             </span>
             <span className="material-symbols-outlined absolute right-2 text-slate-400 text-[16px]">expand_more</span>
           </div>

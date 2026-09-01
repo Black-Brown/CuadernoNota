@@ -38,8 +38,8 @@ export default function DocenteDashboard() {
   const selectedPeriod = usePeriodStore((state) => state.selectedPeriod);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboardSummary'],
-    queryFn: getDashboardSummary,
+    queryKey: ['dashboardSummary', selectedPeriod?.id],
+    queryFn: () => getDashboardSummary(selectedPeriod?.id),
   });
 
   const { data: coursesData } = useQuery({
@@ -112,7 +112,7 @@ export default function DocenteDashboard() {
               <span className={`rounded px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
                 selectedPeriod.status === 'open' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
               }`}>
-                {selectedPeriod.status === 'open' ? 'Activo' : 'Cerrado'}
+                {selectedPeriod.status === 'open' ? 'Activo' : selectedPeriod.status === 'upcoming' ? 'Próximo' : selectedPeriod.status === 'in_review' ? 'En revisión' : selectedPeriod.status === 'ended' ? 'Finalizado' : 'Cerrado'}
               </span>
             )}
           </div>

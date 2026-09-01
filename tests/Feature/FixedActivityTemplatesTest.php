@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Sanctum;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class FixedActivityTemplatesTest extends TestCase
@@ -64,6 +65,7 @@ class FixedActivityTemplatesTest extends TestCase
 
     public function test_assigned_teacher_can_toggle_base_activity_and_the_choice_is_preserved(): void
     {
+        $this->travelTo(Carbon::parse('2030-09-01'));
         $admin = User::factory()->create(['role' => 'admin', 'active' => true]);
         $teacher = User::factory()->create(['role' => 'teacher', 'active' => true]);
         $otherTeacher = User::factory()->create(['role' => 'teacher', 'active' => true]);

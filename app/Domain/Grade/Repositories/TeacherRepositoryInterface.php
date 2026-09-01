@@ -19,7 +19,7 @@ interface TeacherRepositoryInterface
      *
      * @return array{active_courses: int, total_students: int, avg_grade: float|null, attendance_avg: float|null}
      */
-    public function getDashboardSummary(int $teacherId): array;
+    public function getDashboardSummary(int $teacherId, ?int $periodId = null): array;
 
     /**
      * Dashboard de un curso específico:
@@ -28,5 +28,5 @@ interface TeacherRepositoryInterface
      *
      * @return array{group_avg: float|null, at_risk_count: int, period_progress: float, attendance_pct: float|null, distribution: array}
      */
-    public function getSubjectDashboard(int $teacherId, int $sectionId, int $subjectId): array;
+    public function getSubjectDashboard(int $teacherId, int $sectionId, int $subjectId, ?int $periodId = null): array;
 }

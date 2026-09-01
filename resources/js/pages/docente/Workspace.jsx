@@ -49,9 +49,9 @@ export default function Workspace() {
   const subjectName = currentCourse ? currentCourse.subject_name : 'Matemática';
 
   const { data: subjectStats } = useQuery({
-    queryKey: ['subjectDashboard', sectionId, subjectId],
-    queryFn: () => getSubjectDashboard(sectionId, subjectId),
-    enabled: !!sectionId && !!subjectId,
+    queryKey: ['subjectDashboard', sectionId, subjectId, selectedPeriod?.id],
+    queryFn: () => getSubjectDashboard(sectionId, subjectId, selectedPeriod?.id),
+    enabled: !!sectionId && !!subjectId && !!selectedPeriod?.id,
     staleTime: 3 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
@@ -130,9 +130,9 @@ export default function Workspace() {
 
   const activityMeta = BASE_ACTIVITY_PRESENTATION;
 
-  const groupAvg = subjectStats?.group_avg ?? 80.5;
-  const atRiskCount = subjectStats?.at_risk_count ?? 12;
-  const attendancePct = subjectStats?.attendance_pct ?? 96.8;
+  const groupAvg = subjectStats?.group_avg ?? null;
+  const atRiskCount = subjectStats?.at_risk_count ?? 0;
+  const attendancePct = subjectStats?.attendance_pct ?? null;
 
   const studentsList = periodGradesData?.grades || [];
 
@@ -199,7 +199,7 @@ export default function Workspace() {
       ['Periodo', period?.name || ''],
       ['Promedio general', groupAvg],
       ['Riesgo academico', atRiskCount],
-      ['Asistencia', `${attendancePct}%`],
+      ['Asistencia', attendancePct === null ? '—' : `${attendancePct}%`],
       [],
       ['Actividades'],
       ['Nombre', 'Tipo', 'Estado', 'Notas registradas', 'Descripcion'],
@@ -724,7 +724,7 @@ export default function Workspace() {
               </p>
 
               <p className="text-xl font-bold font-mono text-slate-800">
-                {groupAvg}
+                {groupAvg ?? '—'}
               </p>
             </div>
           </div>
@@ -778,7 +778,7 @@ export default function Workspace() {
               </p>
 
               <p className="text-xl font-bold font-mono text-slate-800">
-                {attendancePct}%
+                {attendancePct === null ? '—' : `${attendancePct}%`}
               </p>
             </div>
           </div>

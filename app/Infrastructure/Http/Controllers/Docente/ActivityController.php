@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Infrastructure\Models\Period;
 
 class ActivityController extends Controller
 {
@@ -149,10 +150,7 @@ class ActivityController extends Controller
 
     private function isPeriodOpen(int $periodId): bool
     {
-        return DB::table('periods')
-            ->where('id', $periodId)
-            ->where('status', 'open')
-            ->exists();
+        return Period::find($periodId)?->isOpenForTeacher() ?? false;
     }
 
     private function hasGradesUnderReviewOrOfficial(int $subjectId, int $sectionId, int $periodId): bool

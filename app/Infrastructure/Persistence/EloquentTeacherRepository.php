@@ -9,6 +9,8 @@ use App\Infrastructure\Models\Attendance as AttendanceModel;
 use App\Infrastructure\Models\PeriodGrade as PeriodGradeModel;
 use App\Infrastructure\Models\Student as StudentModel;
 use App\Infrastructure\Models\TeacherSection as TeacherSectionModel;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\DB;
 
 class EloquentTeacherRepository implements TeacherRepositoryInterface
 {
@@ -24,14 +26,19 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
                 'grade_name'       => $ts->section?->grade?->name ?? '',
                 'section_name'     => $ts->section?->name ?? '',
                 'subject_name'     => $ts->subject?->name ?? '',
-                'year_label'       => $ts->academicYear?->label ?? '',
+                'year_label'       => $ts->academicYear?->name ?? '',
             ])
             ->all();
     }
 
-    public function getDashboardSummary(int $teacherId): array
+    public function getDashboardSummary(int $teacherId, ?int $periodId = null): array
     {
+        $period = $periodId ? DB::table('periods')->where('id', $periodId)->first() : null;
+        $academicYearId = $period?->academic_year_id
+            ?? DB::table('academic_years')->where('active', true)->value('id');
+
         $teacherSections = TeacherSectionModel::where('user_id', $teacherId)
+            ->when($academicYearId, fn ($query) => $query->where('academic_year_id', $academicYearId))
             ->with('section.students')
             ->get();
 
@@ -43,16 +50,25 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
             ->where('active', true)
             ->count();
 
-        $avgGrade = PeriodGradeModel::whereIn(
-            'subject_id',
-            $teacherSections->pluck('subject_id')->unique()->all()
-        )->avg('period_score');
+        $avgGrade = DB::table('period_grades')
+            ->join('teacher_sections', function ($join) use ($teacherId) {
+                $join->on('teacher_sections.section_id', '=', 'period_grades.section_id')
+                    ->on('teacher_sections.subject_id', '=', 'period_grades.subject_id')
+                    ->where('teacher_sections.user_id', '=', $teacherId);
+            })
+            ->when($academicYearId, fn ($query) => $query->where('teacher_sections.academic_year_id', $academicYearId))
+            ->when($periodId, fn ($query) => $query->where('period_grades.period_id', $periodId))
+            ->avg(DB::raw('COALESCE(period_grades.rp_score, period_grades.period_score)'));
 
         $attendancePct = null;
         if (!empty($sectionIds)) {
-            $total   = AttendanceModel::whereIn('section_id', $sectionIds)->count();
-            $present = AttendanceModel::whereIn('section_id', $sectionIds)
-                ->where('code', 'P')
+            $attendance = AttendanceModel::whereIn('section_id', $sectionIds)
+                ->when($period, fn ($query) => $query
+                    ->whereDate('date', '>=', $period->start_date)
+                    ->whereDate('date', '<=', $period->end_date));
+            $total = (clone $attendance)->count();
+            $present = (clone $attendance)
+                ->whereIn('code', ['P', 'T'])
                 ->count();
             $attendancePct = $total > 0 ? round($present / $total * 100, 1) : null;
         }
@@ -65,15 +81,28 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
         ];
     }
 
-    public function getSubjectDashboard(int $teacherId, int $sectionId, int $subjectId): array
+    public function getSubjectDashboard(int $teacherId, int $sectionId, int $subjectId, ?int $periodId = null): array
     {
+        $period = $periodId ? DB::table('periods')->where('id', $periodId)->first() : null;
+        $assignment = TeacherSectionModel::where('user_id', $teacherId)
+            ->where('section_id', $sectionId)
+            ->where('subject_id', $subjectId)
+            ->when($period, fn ($query) => $query->where('academic_year_id', $period->academic_year_id))
+            ->exists();
+
+        if (! $assignment) {
+            throw new AuthorizationException('No tienes acceso a este curso en el período seleccionado.');
+        }
+
         $students = StudentModel::where('section_id', $sectionId)
             ->where('active', true)
             ->pluck('id')
             ->all();
 
         $grades = PeriodGradeModel::whereIn('student_id', $students)
+            ->where('section_id', $sectionId)
             ->where('subject_id', $subjectId)
+            ->when($periodId, fn ($query) => $query->where('period_id', $periodId))
             ->get();
 
         $scores = $grades->pluck('period_score')->filter()->all();
@@ -81,8 +110,12 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
         $groupAvg    = count($scores) > 0 ? round(array_sum($scores) / count($scores), 1) : null;
         $atRiskCount = $grades->filter(fn($g) => ($g->period_score ?? 0) < 70)->count();
 
-        $total   = AttendanceModel::where('section_id', $sectionId)->count();
-        $present = AttendanceModel::where('section_id', $sectionId)->where('code', 'P')->count();
+        $attendance = AttendanceModel::where('section_id', $sectionId)
+            ->when($period, fn ($query) => $query
+                ->whereDate('date', '>=', $period->start_date)
+                ->whereDate('date', '<=', $period->end_date));
+        $total = (clone $attendance)->count();
+        $present = (clone $attendance)->whereIn('code', ['P', 'T'])->count();
         $attendancePct = $total > 0 ? round($present / $total * 100, 1) : null;
 
         $distribution = [

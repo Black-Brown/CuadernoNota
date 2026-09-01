@@ -164,6 +164,19 @@ class AttendanceAlertServiceTest extends TestCase
         $this->assertFalse($this->service->hasConsecutiveAbsenceAlert($records));
     }
 
+    public function test_tardanza_interrumpe_ausencias_y_cuenta_como_asistencia(): void
+    {
+        $records = [
+            $this->makeRecord('2025-10-01', AttendanceRecord::STATUS_ABSENT),
+            $this->makeRecord('2025-10-02', AttendanceRecord::STATUS_ABSENT),
+            $this->makeRecord('2025-10-03', AttendanceRecord::STATUS_LATE),
+            $this->makeRecord('2025-10-04', AttendanceRecord::STATUS_ABSENT),
+        ];
+
+        $this->assertFalse($this->service->hasConsecutiveAbsenceAlert($records));
+        $this->assertSame(25.0, $this->service->calculateAnnualAttendancePercentage($records));
+    }
+
     // ──────────────────────────────────────────────────────────────────────
     // Regla 2 — Asistencia anual
     // ──────────────────────────────────────────────────────────────────────

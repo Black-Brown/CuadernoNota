@@ -14,12 +14,12 @@ class EloquentAttendanceRepository implements AttendanceRepositoryInterface
 {
     /**
      * Mapeo de código DB → status dominio.
-     * T (tarde) se trata como ausencia para efectos de alertas.
+     * T (tarde) conserva su estado y cuenta como asistencia.
      */
     private const CODE_TO_STATUS = [
         'P' => AttendanceRecord::STATUS_PRESENT,
         'A' => AttendanceRecord::STATUS_ABSENT,
-        'T' => AttendanceRecord::STATUS_ABSENT,
+        'T' => AttendanceRecord::STATUS_LATE,
         'E' => AttendanceRecord::STATUS_EXCUSED,
     ];
 
@@ -27,6 +27,7 @@ class EloquentAttendanceRepository implements AttendanceRepositoryInterface
     private const STATUS_TO_CODE = [
         AttendanceRecord::STATUS_PRESENT => 'P',
         AttendanceRecord::STATUS_ABSENT  => 'A',
+        AttendanceRecord::STATUS_LATE    => 'T',
         AttendanceRecord::STATUS_EXCUSED => 'E',
     ];
 
@@ -99,14 +100,16 @@ class EloquentAttendanceRepository implements AttendanceRepositoryInterface
 
         $codeToStatus = self::CODE_TO_STATUS;
 
-        return $section->students->map(fn($student) => [
-            'attendance_id' => $existing[$student->id]?->id,
-            'student_id'    => $student->id,
-            'student_name'  => $student->last_name . ', ' . $student->name,
-            'status'        => isset($existing[$student->id])
-                ? ($codeToStatus[$existing[$student->id]->code] ?? null)
-                : null,
-        ])->all();
+        return $section->students->map(function ($student) use ($existing, $codeToStatus): array {
+            $attendance = $existing->get($student->id);
+
+            return [
+                'attendance_id' => $attendance?->id,
+                'student_id'    => $student->id,
+                'student_name'  => $student->last_name . ', ' . $student->name,
+                'status'        => $attendance ? ($codeToStatus[$attendance->code] ?? null) : null,
+            ];
+        })->all();
     }
 
     /** Convierte el modelo Eloquent a la entidad de dominio AttendanceRecord. */

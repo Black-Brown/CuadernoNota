@@ -12,8 +12,8 @@ class GetTeacherDashboard
         private readonly TeacherRepositoryInterface $teacherRepo,
     ) {}
 
-    public function execute(int $teacherId): array
+    public function execute(int $teacherId, ?int $periodId = null): array
     {
-        return $this->teacherRepo->getDashboardSummary($teacherId);
+        return $this->teacherRepo->getDashboardSummary($teacherId, $periodId);
     }
 }

@@ -16,7 +16,7 @@ use App\Domain\Attendance\Entities\AttendanceRecord;
  *   Las excusas (excused) interrumpen la cadena, igual que la presencia.
  *
  * Regla 2 — Asistencia anual por debajo del mínimo:
- *   Si los días presentes representan menos del 80 % del total de
+ *   Si los días presentes o con tardanza representan menos del 80 % del total de
  *   días registrados en el año, se activa la alerta.
  *   Los días excused y absent cuentan como NO presentes.
  */
@@ -82,7 +82,7 @@ class AttendanceAlertService
         }
 
         $presentDays = count(
-            array_filter($yearRecords, fn(AttendanceRecord $r): bool => $r->isPresent())
+            array_filter($yearRecords, fn(AttendanceRecord $r): bool => $r->countsAsAttendance())
         );
 
         $percentage = ($presentDays / $total) * 100.0;
@@ -107,7 +107,7 @@ class AttendanceAlertService
         }
 
         $presentDays = count(
-            array_filter($yearRecords, fn(AttendanceRecord $r): bool => $r->isPresent())
+            array_filter($yearRecords, fn(AttendanceRecord $r): bool => $r->countsAsAttendance())
         );
 
         return ($presentDays / $total) * 100.0;
