@@ -12,8 +12,8 @@ class GetDashboardBySubject
         private readonly TeacherRepositoryInterface $teacherRepo,
     ) {}
 
-    public function execute(int $teacherId, int $sectionId, int $subjectId): array
+    public function execute(int $teacherId, int $sectionId, int $subjectId, ?int $periodId = null): array
     {
-        return $this->teacherRepo->getSubjectDashboard($teacherId, $sectionId, $subjectId);
+        return $this->teacherRepo->getSubjectDashboard($teacherId, $sectionId, $subjectId, $periodId);
     }
 }

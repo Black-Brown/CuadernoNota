@@ -12,6 +12,7 @@ use DateTimeImmutable;
  *
  * Estados posibles:
  *  - present: El estudiante asistió.
+ *  - late:    El estudiante asistió con tardanza.
  *  - absent:  El estudiante faltó sin justificación.
  *  - excused: El estudiante faltó con justificación válida.
  *
@@ -27,13 +28,14 @@ class AttendanceRecord
 {
     public const STATUS_PRESENT = 'present';
     public const STATUS_ABSENT  = 'absent';
+    public const STATUS_LATE    = 'late';
     public const STATUS_EXCUSED = 'excused';
 
     /**
      * @param int               $id        Identificador único del registro
      * @param int               $studentId ID del estudiante
      * @param DateTimeImmutable $date      Fecha del registro de asistencia
-     * @param string            $status    Estado: present | absent | excused
+     * @param string            $status    Estado: present | late | absent | excused
      */
     public function __construct(
         public readonly int               $id,
@@ -58,6 +60,16 @@ class AttendanceRecord
     public function isAbsent(): bool
     {
         return $this->status === self::STATUS_ABSENT;
+    }
+
+    public function isLate(): bool
+    {
+        return $this->status === self::STATUS_LATE;
+    }
+
+    public function countsAsAttendance(): bool
+    {
+        return $this->isPresent() || $this->isLate();
     }
 
     /**

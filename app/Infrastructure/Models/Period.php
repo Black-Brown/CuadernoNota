@@ -21,6 +21,28 @@ class Period extends Model
         'end_date'   => 'date',
     ];
 
+    public function effectiveStatus(): string
+    {
+        if ($this->status !== 'open') {
+            return $this->status;
+        }
+
+        $today = now()->startOfDay();
+        if ($today->lt($this->start_date->startOfDay())) {
+            return 'upcoming';
+        }
+        if ($today->gt($this->end_date->endOfDay())) {
+            return 'ended';
+        }
+
+        return 'open';
+    }
+
+    public function isOpenForTeacher(): bool
+    {
+        return $this->effectiveStatus() === 'open';
+    }
+
     public function academicYear(): BelongsTo
     {
         return $this->belongsTo(AcademicYear::class);

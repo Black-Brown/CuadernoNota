@@ -9,6 +9,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class RiskController extends Controller
 {
@@ -22,8 +23,9 @@ class RiskController extends Controller
     {
         $teacherId = Auth::id() ?? 1;
         $periodId = $this->resolvePeriodId($request);
+        $academicYearId = $this->periodAcademicYearId($periodId);
 
-        $courses = $this->teacherCourses($teacherId)
+        $courses = $this->teacherCourses($teacherId, $academicYearId)
             ->map(fn(object $course): array => $this->courseRiskSummary($course, $periodId))
             ->values();
 
@@ -44,7 +46,7 @@ class RiskController extends Controller
     {
         $teacherId = Auth::id() ?? 1;
         $periodId = $this->resolvePeriodId($request);
-        $course = $this->assignedCourse($teacherId, $sectionId, $subjectId);
+        $course = $this->assignedCourse($teacherId, $sectionId, $subjectId, $this->periodAcademicYearId($periodId));
         $students = $this->riskStudents($sectionId, $subjectId, $periodId);
 
         return response()->json([
@@ -65,7 +67,7 @@ class RiskController extends Controller
     {
         $teacherId = Auth::id() ?? 1;
         $periodId = $this->resolvePeriodId($request);
-        $course = $this->assignedCourse($teacherId, $sectionId, $subjectId);
+        $course = $this->assignedCourse($teacherId, $sectionId, $subjectId, $this->periodAcademicYearId($periodId));
 
         $student = DB::table('students')
             ->where('id', $studentId)
@@ -100,17 +102,34 @@ class RiskController extends Controller
         $periodId = $request->integer('period_id');
 
         if ($periodId > 0) {
-            return $periodId;
+            if (DB::table('periods')->where('id', $periodId)->exists()) {
+                return $periodId;
+            }
+
+            throw ValidationException::withMessages(['period_id' => 'El período seleccionado no existe.']);
         }
 
         return (int) DB::table('periods')
-            ->where('status', 'open')
-            ->orderByDesc('number')
-            ->value('id')
-            ?: (int) DB::table('periods')->orderByDesc('id')->value('id');
+            ->join('academic_years', 'academic_years.id', '=', 'periods.academic_year_id')
+            ->where('academic_years.active', true)
+            ->whereDate('periods.start_date', '<=', now()->toDateString())
+            ->whereDate('periods.end_date', '>=', now()->toDateString())
+            ->select('periods.id')
+            ->value('periods.id');
     }
 
-    private function teacherCourses(int $teacherId): Collection
+    private function periodAcademicYearId(int $periodId): int
+    {
+        $academicYearId = DB::table('periods')->where('id', $periodId)->value('academic_year_id');
+
+        if (! $academicYearId) {
+            throw ValidationException::withMessages(['period_id' => 'No hay un período académico disponible.']);
+        }
+
+        return (int) $academicYearId;
+    }
+
+    private function teacherCourses(int $teacherId, int $academicYearId): Collection
     {
         return DB::table('teacher_sections')
             ->join('sections', 'teacher_sections.section_id', '=', 'sections.id')
@@ -118,6 +137,7 @@ class RiskController extends Controller
             ->join('subjects', 'teacher_sections.subject_id', '=', 'subjects.id')
             ->join('academic_years', 'teacher_sections.academic_year_id', '=', 'academic_years.id')
             ->where('teacher_sections.user_id', $teacherId)
+            ->where('teacher_sections.academic_year_id', $academicYearId)
             ->select(
                 'teacher_sections.section_id',
                 'teacher_sections.subject_id',
@@ -134,9 +154,9 @@ class RiskController extends Controller
             ->get();
     }
 
-    private function assignedCourse(int $teacherId, int $sectionId, int $subjectId): object
+    private function assignedCourse(int $teacherId, int $sectionId, int $subjectId, int $academicYearId): object
     {
-        $course = $this->teacherCourses($teacherId)
+        $course = $this->teacherCourses($teacherId, $academicYearId)
             ->first(fn(object $course): bool => (int) $course->section_id === $sectionId && (int) $course->subject_id === $subjectId);
 
         if (!$course) {
@@ -150,7 +170,7 @@ class RiskController extends Controller
     {
         $students = $this->riskStudents((int) $course->section_id, (int) $course->subject_id, $periodId);
         $groupAverage = $this->groupAverage((int) $course->section_id, (int) $course->subject_id, $periodId);
-        $attendancePct = $this->sectionAttendancePercentage((int) $course->section_id);
+        $attendancePct = $this->sectionAttendancePercentage((int) $course->section_id, $periodId);
         $riskPressure = min(100, (int) round(($students->count() / max(1, $this->activeStudentCount((int) $course->section_id))) * 100));
 
         return array_merge($this->coursePayload($course), [
@@ -211,8 +231,8 @@ class RiskController extends Controller
             'c3' => $periodGrade?->c3_score !== null ? (float) $periodGrade->c3_score : null,
         ];
 
-        $attendancePct = $this->studentAttendancePercentage((int) $student->id);
-        $hasConsecutiveAbsences = $this->hasConsecutiveAbsences((int) $student->id);
+        $attendancePct = $this->studentAttendancePercentage((int) $student->id, $periodId);
+        $hasConsecutiveAbsences = $this->hasConsecutiveAbsences((int) $student->id, $periodId);
         $activeAlerts = $this->activeAlertCount((int) $student->id);
         $weakCompetencies = collect($competencies)->filter(fn(?float $score): bool => $score !== null && $score < self::ACADEMIC_RISK_THRESHOLD);
 
@@ -368,31 +388,35 @@ class RiskController extends Controller
             ->all();
     }
 
-    private function studentAttendancePercentage(int $studentId): float
+    private function studentAttendancePercentage(int $studentId, int $periodId): float
     {
-        $records = DB::table('attendances')->where('student_id', $studentId)->get(['code']);
+        $records = $this->attendanceForPeriod($periodId)
+            ->where('student_id', $studentId)
+            ->get(['code']);
 
         if ($records->isEmpty()) {
             return 100.0;
         }
 
-        return ($records->where('code', 'P')->count() / $records->count()) * 100.0;
+        return ($records->whereIn('code', ['P', 'T'])->count() / $records->count()) * 100.0;
     }
 
-    private function sectionAttendancePercentage(int $sectionId): float
+    private function sectionAttendancePercentage(int $sectionId, int $periodId): float
     {
-        $records = DB::table('attendances')->where('section_id', $sectionId)->get(['code']);
+        $records = $this->attendanceForPeriod($periodId)
+            ->where('section_id', $sectionId)
+            ->get(['code']);
 
         if ($records->isEmpty()) {
             return 100.0;
         }
 
-        return round(($records->where('code', 'P')->count() / $records->count()) * 100.0, 2);
+        return round(($records->whereIn('code', ['P', 'T'])->count() / $records->count()) * 100.0, 2);
     }
 
-    private function hasConsecutiveAbsences(int $studentId): bool
+    private function hasConsecutiveAbsences(int $studentId, int $periodId): bool
     {
-        $records = DB::table('attendances')
+        $records = $this->attendanceForPeriod($periodId)
             ->where('student_id', $studentId)
             ->orderBy('date')
             ->get(['date', 'code'])
@@ -402,7 +426,7 @@ class RiskController extends Controller
             $streak = 0;
 
             foreach ($monthRecords as $record) {
-                if (in_array($record->code, ['A', 'T'], true)) {
+                if ($record->code === 'A') {
                     $streak++;
                     if ($streak >= self::CONSECUTIVE_ABSENCE_THRESHOLD) {
                         return true;
@@ -415,6 +439,15 @@ class RiskController extends Controller
         }
 
         return false;
+    }
+
+    private function attendanceForPeriod(int $periodId)
+    {
+        $period = DB::table('periods')->where('id', $periodId)->first(['start_date', 'end_date']);
+
+        return DB::table('attendances')
+            ->whereDate('date', '>=', $period->start_date)
+            ->whereDate('date', '<=', $period->end_date);
     }
 
     private function activeAlertCount(int $studentId): int

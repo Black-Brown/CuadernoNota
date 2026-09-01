@@ -84,9 +84,7 @@ class RegisterRecovery
             sectionId:   $existing->sectionId,
         );
 
-        $this->periodGradeRepo->upsert($withRp);
-
-        // 3. Obtener los 4 períodos para recalcular el CF
+        // 3. Obtener y validar los 4 períodos antes de modificar datos.
         $allPeriods = $this->periodGradeRepo->findAllPeriodsByStudentSubject(
             $studentId,
             $subjectId,
@@ -100,8 +98,16 @@ class RegisterRecovery
             );
         }
 
+        $allPeriods = array_map(
+            fn (PeriodGrade $periodGrade): PeriodGrade => $periodGrade->periodId === $periodId ? $withRp : $periodGrade,
+            $allPeriods,
+        );
+
         // 4. Recalcular el CF
         $newCf = $this->cfCalculator->calculate($allPeriods);
+
+        // Persistir solamente después de completar todas las validaciones y cálculos.
+        $this->periodGradeRepo->upsert($withRp);
 
         $existingFg = $this->finalGradeRepo->findByStudentSubjectYear($studentId, $subjectId, $academicYearId);
 

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getCourses } from '../../api/courses.api';
 import { getDashboardSummary } from '../../api/dashboard.api';
 import DashboardLayout from '../../components/DashboardLayout';
+import usePeriodStore from '../../store/periodStore';
 
 const SUBJECT_META = [
   {
@@ -71,14 +72,15 @@ function statusMeta(index) {
 }
 
 export default function Courses() {
+  const selectedPeriod = usePeriodStore((state) => state.selectedPeriod);
   const { data, isLoading } = useQuery({
     queryKey: ['courses'],
     queryFn: getCourses,
   });
 
   const { data: summaryData } = useQuery({
-    queryKey: ['dashboardSummary'],
-    queryFn: getDashboardSummary,
+    queryKey: ['dashboardSummary', selectedPeriod?.id],
+    queryFn: () => getDashboardSummary(selectedPeriod?.id),
   });
 
   const rawCourses = data?.courses || [];

@@ -17,6 +17,8 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use App\Infrastructure\Models\Period;
 
 class GradeController extends Controller
 {
@@ -192,46 +194,50 @@ class GradeController extends Controller
             return response()->json(['message' => 'El período no pertenece al año académico seleccionado.'], 422);
         }
 
-        if ($validated['type'] === 'rp') {
-            $finalGrade = $this->registerRecovery->execute(
-                studentId:      $validated['student_id'],
-                subjectId:      $validated['subject_id'],
-                periodId:       $validated['period_id'],
-                academicYearId: $validated['academic_year_id'],
-                rpScore:        (float) $validated['score'],
-            );
+        $this->validateRecoveryEligibility($validated, $studentSectionId);
 
-            return response()->json([
-                'message'     => 'Recuperación pedagógica registrada.',
-                'final_grade' => [
-                    'student_id'      => $finalGrade->studentId,
-                    'subject_id'      => $finalGrade->subjectId,
-                    'cf'              => $finalGrade->cf,
-                    'effective_cf'    => $finalGrade->effectiveCF(),
-                    'final_recovery'  => $finalGrade->finalRecovery,
-                    'special_recovery' => $finalGrade->specialRecovery,
-                ],
-            ]);
-        }
+        return DB::transaction(function () use ($validated): JsonResponse {
+            if ($validated['type'] === 'rp') {
+                $finalGrade = $this->registerRecovery->execute(
+                    studentId:      $validated['student_id'],
+                    subjectId:      $validated['subject_id'],
+                    periodId:       $validated['period_id'],
+                    academicYearId: $validated['academic_year_id'],
+                    rpScore:        (float) $validated['score'],
+                );
 
-        if ($validated['type'] === 'final') {
-            $this->finalGradeRepo->registerFinalRecovery(
+                return response()->json([
+                    'message'     => 'Recuperación pedagógica registrada.',
+                    'final_grade' => [
+                        'student_id'      => $finalGrade->studentId,
+                        'subject_id'      => $finalGrade->subjectId,
+                        'cf'              => $finalGrade->cf,
+                        'effective_cf'    => $finalGrade->effectiveCF(),
+                        'final_recovery'  => $finalGrade->finalRecovery,
+                        'special_recovery' => $finalGrade->specialRecovery,
+                    ],
+                ]);
+            }
+
+            if ($validated['type'] === 'final') {
+                $this->finalGradeRepo->registerFinalRecovery(
+                    $validated['student_id'],
+                    $validated['subject_id'],
+                    $validated['academic_year_id'],
+                    (float) $validated['score'],
+                );
+                return response()->json(['message' => 'Recuperación Final registrada.']);
+            }
+
+            $this->finalGradeRepo->registerSpecialRecovery(
                 $validated['student_id'],
                 $validated['subject_id'],
                 $validated['academic_year_id'],
                 (float) $validated['score'],
             );
-            return response()->json(['message' => 'Recuperación Final registrada.']);
-        }
 
-        $this->finalGradeRepo->registerSpecialRecovery(
-            $validated['student_id'],
-            $validated['subject_id'],
-            $validated['academic_year_id'],
-            (float) $validated['score'],
-        );
-
-        return response()->json(['message' => 'Recuperación Especial registrada.']);
+            return response()->json(['message' => 'Recuperación Especial registrada.']);
+        });
     }
 
     /**
@@ -323,10 +329,7 @@ class GradeController extends Controller
 
     private function isPeriodOpen(int $periodId): bool
     {
-        return DB::table('periods')
-            ->where('id', $periodId)
-            ->where('status', 'open')
-            ->exists();
+        return Period::find($periodId)?->isOpenForTeacher() ?? false;
     }
 
     private function hasGradesUnderReviewOrOfficial(int $subjectId, int $sectionId, int $periodId): bool
@@ -372,5 +375,55 @@ class GradeController extends Controller
             ->where('id', $periodId)
             ->where('academic_year_id', $academicYearId)
             ->exists();
+    }
+
+    private function validateRecoveryEligibility(array $data, int $sectionId): void
+    {
+        if ($data['type'] === 'rp') {
+            $periodGrade = DB::table('period_grades')
+                ->where('student_id', $data['student_id'])
+                ->where('section_id', $sectionId)
+                ->where('subject_id', $data['subject_id'])
+                ->where('period_id', $data['period_id'])
+                ->first();
+
+            if (! $periodGrade) {
+                throw ValidationException::withMessages(['period_id' => 'No existe una calificación del período para recuperar.']);
+            }
+            if (! $this->isPeriodOpen((int) $data['period_id']) || $periodGrade->status !== 'draft') {
+                throw ValidationException::withMessages(['period_id' => 'La recuperación pedagógica solo puede registrarse mientras el período y la calificación estén en edición.']);
+            }
+            if ($periodGrade->period_score === null || (float) $periodGrade->period_score >= 70) {
+                throw ValidationException::withMessages(['score' => 'La recuperación pedagógica solo aplica a una calificación de período reprobada.']);
+            }
+
+            return;
+        }
+
+        $openPeriods = DB::table('periods')
+            ->where('academic_year_id', $data['academic_year_id'])
+            ->where('status', '!=', 'closed')
+            ->count();
+        if ($openPeriods > 0) {
+            throw ValidationException::withMessages(['academic_year_id' => 'Debes cerrar todos los períodos antes de registrar una recuperación final o especial.']);
+        }
+
+        $finalGrade = DB::table('final_grades')
+            ->where('student_id', $data['student_id'])
+            ->where('subject_id', $data['subject_id'])
+            ->where('academic_year_id', $data['academic_year_id'])
+            ->first();
+
+        if (! $finalGrade) {
+            throw ValidationException::withMessages(['student_id' => 'No existe una calificación final para este estudiante y materia.']);
+        }
+
+        if ($data['type'] === 'final' && ($finalGrade->cf === null || (float) $finalGrade->cf >= 70)) {
+            throw ValidationException::withMessages(['score' => 'La recuperación final solo aplica cuando la calificación final es menor de 70.']);
+        }
+
+        if ($data['type'] === 'special' && ($finalGrade->final_recovery === null || (float) $finalGrade->final_recovery >= 70)) {
+            throw ValidationException::withMessages(['score' => 'La recuperación especial requiere una recuperación final reprobada.']);
+        }
     }
 }

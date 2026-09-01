@@ -7,6 +7,7 @@ import Workspace from './pages/docente/Workspace';
 import ActivityGrades from './pages/docente/ActivityGrades.jsx';
 import Grades from './pages/docente/Grades.jsx';
 import Observations from './pages/docente/Observations.jsx';
+import Attendance from './pages/docente/Attendance.jsx';
 import ModuleComingSoon from './pages/docente/ModuleComingSoon.jsx';
 import RiskOverview from './pages/docente/RiskOverview.jsx';
 import RiskCourse from './pages/docente/RiskCourse.jsx';
@@ -84,16 +85,8 @@ export default function App() {
                   <Route path="risk/:sectionId/:subjectId/students/:studentId" element={<RiskStudent />} />
                   <Route path="courses/:sectionId/:subjectId" element={<Workspace />} />
                   <Route path="courses/:sectionId/:subjectId/activity/:activityId" element={<ActivityGrades />} />
-                  <Route
-                    path="attendance"
-                    element={
-                      <ModuleComingSoon
-                        title="Asistencia en produccion"
-                        icon="fact_check"
-                        description="El registro general de asistencia aun no esta activo desde esta pantalla. Por ahora, continua trabajando desde tus cursos asignados."
-                      />
-                    }
-                  />
+                  <Route path="attendance" element={<Attendance />} />
+                  <Route path="attendance/:sectionId" element={<Attendance />} />
                   <Route path="observations" element={<Observations />} />
                   <Route path="observations/:sectionId/:subjectId" element={<Observations />} />
                   <Route path="*" element={<ModuleComingSoon title="Pagina en produccion" />} />

@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Infrastructure\Models\Period;
 
 class ObservationController extends Controller
 {
@@ -127,6 +128,10 @@ class ObservationController extends Controller
             return response()->json(['message' => 'Observación no encontrada.'], 404);
         }
 
+        if ((int) $observation->user_id !== (int) Auth::id()) {
+            return response()->json(['message' => 'Solo el autor puede modificar esta observación.'], 403);
+        }
+
         if (!$this->canModifyObservation($observation)) {
             return response()->json([
                 'message' => 'No puedes modificar esta observación en el estado actual del workspace.',
@@ -150,6 +155,10 @@ class ObservationController extends Controller
 
         if (!$observation) {
             return response()->json(['message' => 'Observación no encontrada.'], 404);
+        }
+
+        if ((int) $observation->user_id !== (int) Auth::id()) {
+            return response()->json(['message' => 'Solo el autor puede eliminar esta observación.'], 403);
         }
 
         if (!$this->canModifyObservation($observation)) {
@@ -194,6 +203,7 @@ class ObservationController extends Controller
         }
 
         return $this->isAssignedCourse(Auth::id() ?? 1, (int) $observation->section_id, (int) $observation->subject_id)
+            && (int) $observation->user_id === (int) (Auth::id() ?? 1)
             && $this->canEditWorkspace((int) $observation->subject_id, (int) $observation->section_id, (int) $observation->period_id);
     }
 
@@ -238,10 +248,7 @@ class ObservationController extends Controller
 
     private function isPeriodOpen(int $periodId): bool
     {
-        return DB::table('periods')
-            ->where('id', $periodId)
-            ->where('status', 'open')
-            ->exists();
+        return Period::find($periodId)?->isOpenForTeacher() ?? false;
     }
 
     private function hasGradesUnderReviewOrOfficial(int $subjectId, int $sectionId, int $periodId): bool
