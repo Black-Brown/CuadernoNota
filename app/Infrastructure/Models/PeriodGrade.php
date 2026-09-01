@@ -10,7 +10,7 @@ class PeriodGrade extends Model
     protected $table = 'period_grades';
 
     protected $fillable = [
-        'student_id', 'subject_id', 'period_id',
+        'student_id', 'section_id', 'subject_id', 'period_id',
         'c1_score', 'c2_score', 'c3_score',
         'period_score', 'rp_score',
         'status', 'approved_at', 'approved_by',
@@ -28,6 +28,11 @@ class PeriodGrade extends Model
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
+    }
+
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(Section::class);
     }
 
     public function subject(): BelongsTo

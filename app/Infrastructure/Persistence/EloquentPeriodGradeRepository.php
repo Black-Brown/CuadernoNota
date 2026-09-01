@@ -30,6 +30,7 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
                 'period_score' => $periodGrade->periodScore,
                 'rp_score'     => $periodGrade->rpScore,
                 'status'       => $periodGrade->status,
+                'section_id'   => $periodGrade->sectionId,
             ]
         );
 
@@ -74,7 +75,7 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
     {
         PeriodGradeModel::where('subject_id', $subjectId)
             ->where('period_id', $periodId)
-            ->when($sectionId, fn($query) => $query->whereHas('student', fn($studentQuery) => $studentQuery->where('section_id', $sectionId)))
+            ->when($sectionId, fn($query) => $query->where('section_id', $sectionId))
             ->where('status', 'draft')
             ->update(['status' => 'in_review']);
     }
@@ -109,7 +110,7 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
     {
         $grades = PeriodGradeModel::where('subject_id', $subjectId)
             ->where('period_id', $periodId)
-            ->when($sectionId, fn($query) => $query->whereHas('student', fn($studentQuery) => $studentQuery->where('section_id', $sectionId)))
+            ->when($sectionId, fn($query) => $query->where('section_id', $sectionId))
             ->with('student:id,name,last_name')
             ->get();
 
@@ -277,6 +278,7 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
             periodScore: (float) ($model->period_score ?? 0),
             rpScore:     $model->rp_score !== null ? (float) $model->rp_score : null,
             status:      $model->status,
+            sectionId:   $model->section_id !== null ? (int) $model->section_id : null,
         );
     }
 }

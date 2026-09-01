@@ -27,7 +27,7 @@ const PROCESS_STEPS = [
 ];
 
 const QUICK_ACTIONS = [
-  { label: 'Registrar usuario', desc: 'Docente, coordinador o admin', icon: 'person_add', path: '/admin/users' },
+  { label: 'Registrar usuario', desc: 'Docente o administrador', icon: 'person_add', path: '/admin/users' },
   { label: 'Inscribir estudiante', desc: 'Nueva matrícula académica', icon: 'person_add_alt', path: '/admin/students' },
   { label: 'Crear sección', desc: 'Grado, tanda y año escolar', icon: 'domain_add', path: '/admin/catalog' },
   { label: 'Asignar docente', desc: 'Curso, sección y materia', icon: 'assignment_ind', path: '/admin/assignments' },

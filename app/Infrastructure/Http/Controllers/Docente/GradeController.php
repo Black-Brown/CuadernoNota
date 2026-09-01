@@ -283,6 +283,8 @@ class GradeController extends Controller
             return response()->json(['message' => 'No tienes permiso para modificar notas de este curso.'], 403);
         }
 
+        $validated['section_id'] = (int) $activity->section_id;
+
         if ($this->hasGradesUnderReviewOrOfficial(
             (int) $validated['subject_id'],
             (int) $activity->section_id,
@@ -330,10 +332,9 @@ class GradeController extends Controller
     private function hasGradesUnderReviewOrOfficial(int $subjectId, int $sectionId, int $periodId): bool
     {
         return DB::table('period_grades')
-            ->join('students', 'period_grades.student_id', '=', 'students.id')
             ->where('period_grades.subject_id', $subjectId)
             ->where('period_grades.period_id', $periodId)
-            ->where('students.section_id', $sectionId)
+            ->where('period_grades.section_id', $sectionId)
             ->whereIn('period_grades.status', ['in_review', 'official'])
             ->exists();
     }

@@ -27,12 +27,10 @@ export default function Reports() {
   const academicRows = academic.data?.rows || [];
   const attendanceRows = attendance.data || [];
 
-  const academicTotals = academicRows.reduce((acc, r) => ({
-    students: acc.students + Number(r.students || 0),
-    atRisk: acc.atRisk + Number(r.at_risk || 0),
-    averageSum: acc.averageSum + Number(r.average || 0),
-  }), { students: 0, atRisk: 0, averageSum: 0 });
-  const academicAvg = academicRows.length ? (academicTotals.averageSum / academicRows.length).toFixed(1) : '—';
+  const academicSummary = academic.data?.summary || {};
+  const evaluatedStudents = Number(academicSummary.evaluated_students || 0);
+  const atRiskStudents = Number(academicSummary.at_risk_students || 0);
+  const academicAvg = academicSummary.overall_average != null ? Number(academicSummary.overall_average).toFixed(1) : '—';
 
   const attendanceTotals = attendanceRows.reduce((acc, r) => ({
     records: acc.records + Number(r.records || 0),
@@ -74,9 +72,9 @@ export default function Reports() {
       {tab === 'academic' ? (
         <>
           <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-            <KpiCard label="Estudiantes evaluados" value={academicTotals.students} icon="groups" tone="bg-sky-50 text-sky-700" loading={academic.isLoading} />
+            <KpiCard label="Estudiantes evaluados" value={evaluatedStudents} icon="groups" tone="bg-sky-50 text-sky-700" loading={academic.isLoading} />
             <KpiCard label="Promedio general" value={academicAvg} icon="analytics" tone="bg-emerald-50 text-emerald-700" loading={academic.isLoading} />
-            <KpiCard label="Estudiantes en riesgo" value={academicTotals.atRisk} icon="warning" tone="bg-red-50 text-red-700" loading={academic.isLoading} />
+            <KpiCard label="Estudiantes en riesgo" value={atRiskStudents} icon="warning" tone="bg-red-50 text-red-700" loading={academic.isLoading} />
           </section>
 
           <div className="mb-3 flex justify-end">
@@ -114,7 +112,7 @@ export default function Reports() {
         <>
           <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
             <KpiCard label="Registros" value={attendanceTotals.records} icon="fact_check" tone="bg-indigo-50 text-indigo-700" loading={attendance.isLoading} />
-            <KpiCard label="Presentes" value={attendanceTotals.present} icon="check_circle" tone="bg-emerald-50 text-emerald-700" loading={attendance.isLoading} />
+            <KpiCard label="Asistieron (P + T)" value={attendanceTotals.present} icon="check_circle" tone="bg-emerald-50 text-emerald-700" loading={attendance.isLoading} />
             <KpiCard label="Ausentes" value={attendanceTotals.absent} icon="cancel" tone="bg-red-50 text-red-700" loading={attendance.isLoading} />
             <KpiCard label="Tasa de asistencia" value={`${attendanceRate}%`} icon="trending_up" tone="bg-sky-50 text-sky-700" loading={attendance.isLoading} />
           </section>
@@ -122,7 +120,7 @@ export default function Reports() {
           <div className="mb-3 flex justify-end">
             <button
               onClick={() => downloadCsv(`reporte-asistencia-${safeFilename(yearName)}`, [
-                ['Grado', 'Sección', 'Registros', 'Presentes', 'Ausentes', 'Tardanzas', 'Excusas'],
+                ['Grado', 'Sección', 'Registros', 'Asistieron (P + T)', 'Ausentes', 'Tardanzas', 'Excusas'],
                 ...attendanceRows.map((r) => [r.grade, r.section, r.records, r.present, r.absent, r.late, r.excused]),
               ])}
               disabled={attendanceRows.length === 0}
@@ -143,7 +141,7 @@ export default function Reports() {
               { key: 'grade', label: 'Grado' },
               { key: 'section', label: 'Sección' },
               { key: 'records', label: 'Registros', align: 'center' },
-              { key: 'present', label: 'Presentes', align: 'center' },
+              { key: 'present', label: 'Asistieron', align: 'center' },
               { key: 'absent', label: 'Ausentes', align: 'center' },
               { key: 'late', label: 'Tardanzas', align: 'center' },
               { key: 'excused', label: 'Excusas', align: 'center' },

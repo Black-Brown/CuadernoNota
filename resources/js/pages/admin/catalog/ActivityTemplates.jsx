@@ -50,7 +50,7 @@ export default function ActivityTemplates() {
 
   return (
     <>
-      <p className="mb-4 text-sm text-slate-600">Las seis actividades base fijas se conservan siempre, incluso al restablecer el sistema. No se pueden renombrar, desactivar ni eliminar.</p>
+      <p className="mb-4 text-sm text-slate-600">Las seis actividades base fijas se conservan siempre y no se pueden eliminar. Desde aquí puedes editar su presentación o desactivarlas en el catálogo; cada docente decide cuáles utiliza en sus cursos.</p>
       <div className="mb-4 flex justify-end">
         <button onClick={openCreate} className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800">
           <span className="material-symbols-outlined text-[18px]">add</span>
@@ -76,13 +76,13 @@ export default function ActivityTemplates() {
               </div>
               <p className="text-sm font-extrabold text-slate-900">{template.name}</p>
               <p className="mt-2 text-xs leading-5 text-slate-500">{meta.desc}</p>
-              {template.is_fixed && <p className="mt-1 text-xs font-bold text-indigo-700">Base fija · Protegida</p>}
+              {template.is_fixed && <p className="mt-1 text-xs font-bold text-indigo-700">Base fija · Protegida contra eliminación</p>}
               <p className="mt-1 text-[11px] text-slate-400">{template.course_activities_count ?? 0} usos</p>
               <div className="mt-4 flex gap-3 border-t border-slate-100 pt-3">
                 <button onClick={() => openEdit(template)} className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800">
                   <span className="material-symbols-outlined text-[15px]">edit</span> Editar
                 </button>
-                {template.active && !template.is_fixed && (
+                {template.active && (
                   <button onClick={() => setDeactivateTarget(template)} className="flex items-center gap-1 text-xs font-bold text-red-500 hover:text-red-700">
                     <span className="material-symbols-outlined text-[15px]">block</span> Desactivar
                   </button>
@@ -111,7 +111,7 @@ export default function ActivityTemplates() {
         <div className="space-y-4">
           {error && <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{error}</div>}
           <FormField label="Nombre" required hint="Ej. Proyectos, Examen, Tareas">
-            <input className={inputClass} disabled={editing?.is_fixed} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input className={inputClass} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </FormField>
           <FormField label="Ícono" hint="Nombre de un Material Symbol, ej. assignment">
             <input className={inputClass} value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} />
@@ -122,7 +122,7 @@ export default function ActivityTemplates() {
             </div>
             <p className="text-xs text-slate-500">Vista previa del ícono en el catálogo.</p>
           </div>
-          {editing && !editing.is_fixed && (
+          {editing && (
             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
               <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
               Actividad activa

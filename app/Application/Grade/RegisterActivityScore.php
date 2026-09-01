@@ -99,6 +99,7 @@ class RegisterActivityScore
             periodScore: $periodScore,
             rpScore:     $existing?->rpScore,
             status:      $existing?->status ?? 'draft',
+            sectionId:   isset($scoreData['section_id']) ? (int) $scoreData['section_id'] : $existing?->sectionId,
         );
 
         return $this->periodGradeRepo->upsert($periodGrade);

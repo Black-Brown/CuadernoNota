@@ -129,7 +129,10 @@ class ActivityController extends Controller
             ], 423);
         }
 
-        if ((int) $model->user_id !== (int) (Auth::id() ?? 1)) {
+        $canToggle = $model->is_base
+            ? $this->isAssignedToOffering((int) (Auth::id() ?? 1), (int) $model->course_offering_id)
+            : (int) $model->user_id === (int) (Auth::id() ?? 1);
+        if (! $canToggle) {
             return response()->json([
                 'message' => 'No tienes permiso para modificar esta actividad.',
             ], 403);
@@ -155,11 +158,26 @@ class ActivityController extends Controller
     private function hasGradesUnderReviewOrOfficial(int $subjectId, int $sectionId, int $periodId): bool
     {
         return DB::table('period_grades')
-            ->join('students', 'period_grades.student_id', '=', 'students.id')
             ->where('period_grades.subject_id', $subjectId)
             ->where('period_grades.period_id', $periodId)
-            ->where('students.section_id', $sectionId)
+            ->where('period_grades.section_id', $sectionId)
             ->whereIn('period_grades.status', ['in_review', 'official'])
             ->exists();
+    }
+
+    private function isAssignedToOffering(int $teacherId, int $offeringId): bool
+    {
+        if (DB::table('teacher_assignments')->where('teacher_id', $teacherId)
+            ->where('course_offering_id', $offeringId)->where('active', true)->exists()) {
+            return true;
+        }
+
+        return DB::table('course_offerings')->join('sections', 'sections.id', '=', 'course_offerings.section_id')
+            ->join('teacher_sections', function ($join) use ($teacherId) {
+                $join->on('teacher_sections.section_id', '=', 'sections.id')
+                    ->on('teacher_sections.subject_id', '=', 'course_offerings.subject_id')
+                    ->on('teacher_sections.academic_year_id', '=', 'sections.academic_year_id')
+                    ->where('teacher_sections.user_id', '=', $teacherId);
+            })->where('course_offerings.id', $offeringId)->exists();
     }
 }

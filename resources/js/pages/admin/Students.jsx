@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createAdminStudent, getAdminStudents, getSections } from '../../api/admin.api';
+import { createAdminStudent, getAdminStudents } from '../../api/admin.api';
 import useToast from '../../hooks/useToast';
 import { getErrorMessage } from '../../utils/apiError';
 import PageHeader from '../../components/ui/PageHeader';
@@ -12,8 +12,9 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import SideDrawer from '../../components/ui/SideDrawer';
 import FormField, { inputClass, selectClass } from '../../components/ui/FormField';
 import Toast from '../../components/ui/Toast';
+import StudentImportDrawer from '../../components/admin/StudentImportDrawer';
 
-const EMPTY_FORM = { name: '', last_name: '', enrollment_no: '', section_id: '', enrolled_at: '' };
+const EMPTY_FORM = { name: '', last_name: '', enrollment_no: '' };
 
 export default function AdminStudents() {
   const qc = useQueryClient();
@@ -21,20 +22,18 @@ export default function AdminStudents() {
   const { toast, showToast } = useToast();
 
   const [search, setSearch] = useState('');
-  const [sectionId, setSectionId] = useState('');
   const [active, setActive] = useState('');
   const [page, setPage] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
 
   const params = { per_page: 25, page };
   if (search) params.search = search;
-  if (sectionId) params.section_id = sectionId;
   if (active !== '') params.active = active;
 
   const { data, isLoading } = useQuery({ queryKey: ['admin-students', params], queryFn: () => getAdminStudents(params) });
-  const { data: sections } = useQuery({ queryKey: ['admin-sections'], queryFn: () => getSections() });
   const students = data?.data || [];
 
   const createMutation = useMutation({
@@ -43,7 +42,7 @@ export default function AdminStudents() {
       qc.invalidateQueries({ queryKey: ['admin-students'] });
       setDrawerOpen(false);
       setForm(EMPTY_FORM);
-      showToast('Estudiante inscrito correctamente.');
+      showToast('Estudiante registrado y pendiente de asignación.');
     },
     onError: (err) => setError(getErrorMessage(err)),
   });
@@ -56,20 +55,18 @@ export default function AdminStudents() {
         breadcrumb={['Portal Administrativo', 'Estudiantes']}
         title="Estudiantes"
         description="Inscripciones activas e historial académico del estudiantado."
-        actions={
-          <button onClick={openCreate} className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800">
-            <span className="material-symbols-outlined text-[18px]">person_add_alt</span>
-            Inscribir estudiante
+        actions={<div className="flex flex-wrap gap-2">
+          <button onClick={() => setImportOpen(true)} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+            <span className="material-symbols-outlined text-[18px]">upload_file</span> Importar CSV
           </button>
-        }
+          <button onClick={openCreate} className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800">
+            <span className="material-symbols-outlined text-[18px]">person_add_alt</span> Registrar estudiante
+          </button>
+        </div>}
       />
 
       <FilterBar>
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Buscar por nombre o matrícula..." className="max-w-xs" />
-        <select value={sectionId} onChange={(e) => { setSectionId(e.target.value); setPage(1); }} className={`${selectClass} w-auto`}>
-          <option value="">Todas las secciones</option>
-          {sections?.map((s) => <option key={s.id} value={s.id}>{s.grade?.name} {s.name} · {s.academicYear?.name}</option>)}
-        </select>
         <select value={active} onChange={(e) => { setActive(e.target.value); setPage(1); }} className={`${selectClass} w-auto`}>
           <option value="">Todos los estados</option>
           <option value="1">Activo</option>
@@ -86,9 +83,9 @@ export default function AdminStudents() {
         columns={[
           { key: 'enrollment_no', label: 'Matrícula', render: (s) => <span className="font-mono text-xs font-bold text-slate-500">{s.enrollment_no}</span> },
           { key: 'name', label: 'Estudiante', render: (s) => <span className="font-bold text-slate-900">{s.name} {s.last_name}</span> },
-          { key: 'section', label: 'Grado / Sección', render: (s) => s.section ? `${s.section.grade?.name} ${s.section.name}` : '—' },
-          { key: 'year', label: 'Año escolar', render: (s) => s.section?.academicYear?.name || '—' },
-          { key: 'active', label: 'Estado', align: 'center', render: (s) => <StatusBadge tone={s.active ? 'success' : 'neutral'} label={s.active ? 'Activo' : 'Inactivo'} /> },
+          { key: 'section', label: 'Grado / Sección', render: (s) => s.section ? `${s.section.grade?.name} ${s.section.name}` : <span className="font-semibold text-amber-600">Pendiente de asignación</span> },
+          { key: 'year', label: 'Año escolar', render: (s) => s.section?.academic_year?.name || '—' },
+          { key: 'active', label: 'Estado', align: 'center', render: (s) => <StatusBadge tone={!s.active ? 'neutral' : s.section ? 'success' : 'warning'} label={!s.active ? 'Inactivo' : s.section ? 'Inscrito' : 'Pendiente'} /> },
         ]}
       />
 
@@ -105,18 +102,18 @@ export default function AdminStudents() {
       <SideDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        title="Inscribir estudiante"
-        description="Registra una nueva matrícula académica."
+        title="Registrar estudiante"
+        description="Crea su expediente. La sección se asignará posteriormente desde Gestión académica."
         footer={
           <div className="flex justify-end gap-3">
             <button onClick={() => setDrawerOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50">Cancelar</button>
             <button
               onClick={() => createMutation.mutate(form)}
-              disabled={createMutation.isPending || !form.name || !form.last_name || !form.enrollment_no || !form.section_id || !form.enrolled_at}
+              disabled={createMutation.isPending || !form.name || !form.last_name || !form.enrollment_no}
               className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
             >
               {createMutation.isPending && <span className="material-symbols-outlined animate-spin text-[16px]">sync</span>}
-              Inscribir
+              Registrar
             </button>
           </div>
         }
@@ -132,17 +129,14 @@ export default function AdminStudents() {
           <FormField label="Número de matrícula" required>
             <input className={inputClass} value={form.enrollment_no} onChange={(e) => setForm({ ...form, enrollment_no: e.target.value })} />
           </FormField>
-          <FormField label="Sección" required>
-            <select className={selectClass} value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value })}>
-              <option value="">Seleccionar sección</option>
-              {sections?.map((s) => <option key={s.id} value={s.id}>{s.grade?.name} {s.name} · {s.academicYear?.name}</option>)}
-            </select>
-          </FormField>
-          <FormField label="Fecha de inscripción" required>
-            <input type="date" className={inputClass} value={form.enrolled_at} onChange={(e) => setForm({ ...form, enrolled_at: e.target.value })} />
-          </FormField>
         </div>
       </SideDrawer>
+
+      <StudentImportDrawer open={importOpen} onClose={() => setImportOpen(false)} onImported={(result) => {
+        qc.invalidateQueries({ queryKey: ['admin-students'] });
+        setImportOpen(false);
+        showToast(result.message || `${result.imported} estudiantes importados correctamente.`);
+      }} />
 
       <Toast toast={toast} />
     </>

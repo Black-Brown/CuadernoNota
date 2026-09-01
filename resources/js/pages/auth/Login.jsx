@@ -3,12 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { exchangeGoogleCode, login } from '../../api/auth.api';
 import useAuthStore from '../../store/authStore';
-
-const roleRoutes = {
-  teacher:     '/docente/dashboard',
-  coordinator: '/coordinador/dashboard',
-  admin:       '/admin/dashboard',
-};
+import { routeForRole } from '../../utils/adminAccess';
 
 const googleErrorMessages = {
   access_denied: 'El acceso con Google fue cancelado.',
@@ -32,7 +27,7 @@ export default function Login() {
     mutationFn: login,
     onSuccess: (data) => {
       setAuth(data.user, data.token);
-      navigate(roleRoutes[data.user.role] || '/');
+      navigate(routeForRole(data.user.role));
     },
   });
 
@@ -40,7 +35,7 @@ export default function Login() {
     mutationFn: exchangeGoogleCode,
     onSuccess: (data) => {
       setAuth(data.user, data.token);
-      navigate(roleRoutes[data.user.role] || '/');
+      navigate(routeForRole(data.user.role));
     },
   });
 

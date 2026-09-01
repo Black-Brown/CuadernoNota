@@ -20,6 +20,11 @@ export const createAdminStudent = data => api.post('/admin/students', data).then
 export const updateAdminStudent = (id, data) => api.patch(`/admin/students/${id}`, data).then(r => r.data);
 export const enrollStudent = (id, data) => api.post(`/admin/students/${id}/enrollments`, data).then(r => r.data);
 export const deactivateStudent = (id, data) => api.post(`/admin/students/${id}/deactivate`, data).then(r => r.data);
+const studentCsvForm = file => { const data = new FormData(); data.append('file', file); return data; };
+export const previewStudentImport = file => api.post('/admin/students/import/preview', studentCsvForm(file)).then(r => r.data);
+export const importStudentsCsv = file => api.post('/admin/students/import', studentCsvForm(file)).then(r => r.data);
+export const getPendingStudentPlacements = (params = {}) => api.get('/admin/student-placements/pending', { params }).then(r => r.data);
+export const assignStudentsToSection = data => api.post('/admin/student-placements', data).then(r => r.data);
 
 // ── Años escolares ───────────────────────────────────────────────────────────
 export const getAcademicYears = () => api.get('/admin/academic-years').then(r => r.data);
@@ -83,6 +88,7 @@ export const decideGradeReview = data => api.post('/admin/grade-reviews/decision
 export const getPromotionCandidates = params => api.get('/admin/promotions/candidates', { params }).then(r => r.data);
 export const decidePromotion = (studentEnrollmentId, data) =>
   api.post(`/admin/promotions/${studentEnrollmentId}/decision`, data).then(r => r.data);
+export const decidePromotionsBulk = data => api.post('/admin/promotions/bulk-decision', data).then(r => r.data);
 
 // ── Reportes ─────────────────────────────────────────────────────────────────
 export const getAcademicReport = (params = {}) => api.get('/admin/reports/academic', { params }).then(r => r.data);

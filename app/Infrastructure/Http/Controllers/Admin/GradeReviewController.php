@@ -15,7 +15,7 @@ class GradeReviewController extends Controller
     {
         return response()->json(DB::table('period_grades')
             ->join('students', 'period_grades.student_id', '=', 'students.id')
-            ->join('sections', 'students.section_id', '=', 'sections.id')
+            ->join('sections', 'period_grades.section_id', '=', 'sections.id')
             ->join('grades', 'sections.grade_id', '=', 'grades.id')
             ->join('subjects', 'period_grades.subject_id', '=', 'subjects.id')
             ->join('periods', 'period_grades.period_id', '=', 'periods.id')
@@ -28,7 +28,7 @@ class GradeReviewController extends Controller
     public function show(int $sectionId, int $subjectId, int $periodId): JsonResponse
     {
         return response()->json(DB::table('period_grades')->join('students', 'period_grades.student_id', '=', 'students.id')
-            ->where('students.section_id', $sectionId)->where('period_grades.subject_id', $subjectId)->where('period_grades.period_id', $periodId)
+            ->where('period_grades.section_id', $sectionId)->where('period_grades.subject_id', $subjectId)->where('period_grades.period_id', $periodId)
             ->select('period_grades.*', 'students.name', 'students.last_name', 'students.enrollment_no')->orderBy('students.last_name')->get());
     }
 
@@ -40,7 +40,7 @@ class GradeReviewController extends Controller
         ]);
         $updated = DB::transaction(function () use ($data, $request) {
             $query = DB::table('period_grades')->where('subject_id', $data['subject_id'])->where('period_id', $data['period_id'])
-                ->whereIn('student_id', DB::table('students')->where('section_id', $data['section_id'])->select('id'));
+                ->where('section_id', $data['section_id']);
             $expected = $data['action'] === 'reopened' ? 'official' : 'in_review';
             $values = $data['action'] === 'approved'
                 ? ['status' => 'official', 'approved_by' => $request->user()->id, 'approved_at' => now()]

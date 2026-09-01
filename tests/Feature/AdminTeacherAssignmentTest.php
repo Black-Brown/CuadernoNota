@@ -83,13 +83,14 @@ class AdminTeacherAssignmentTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $this->postJson('/api/admin/teacher-assignments', [
+        $assignmentId = $this->postJson('/api/admin/teacher-assignments', [
             'teacher_id' => $teacherId,
             'course_offering_id' => $offeringId,
         ])->assertCreated()
             ->assertJsonPath('teacher_id', $teacherId)
             ->assertJsonPath('assigned_by', $admin->id)
-            ->assertJsonPath('active', true);
+            ->assertJsonPath('active', true)
+            ->json('id');
 
         $this->assertDatabaseHas('teacher_assignments', [
             'teacher_id' => $teacherId,
@@ -128,6 +129,21 @@ class AdminTeacherAssignmentTest extends TestCase
             'subject_id' => $subjectId,
             'academic_year_id' => $yearId,
         ]);
+
+        $inactiveSubjectId = DB::table('subjects')->insertGetId([
+            'name' => 'Materia inactiva', 'code' => 'INACT', 'active' => false,
+        ]);
+        $inactiveOfferingId = DB::table('course_offerings')->insertGetId([
+            'section_id' => $sectionId, 'subject_id' => $inactiveSubjectId, 'active' => false,
+        ]);
+        $this->patchJson("/api/admin/teacher-assignments/{$assignmentId}", [
+            'course_offering_id' => $inactiveOfferingId,
+        ])->assertUnprocessable()->assertJsonValidationErrors('course_offering_id');
+
+        DB::table('users')->where('id', $teacherId)->update(['active' => false]);
+        $this->patchJson("/api/admin/teacher-assignments/{$assignmentId}", [
+            'active' => true,
+        ])->assertUnprocessable()->assertJsonValidationErrors('active');
     }
 
     public function test_teacher_cannot_use_admin_assignment_endpoints(): void

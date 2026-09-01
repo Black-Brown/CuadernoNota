@@ -11,22 +11,15 @@ class ActivityTemplate extends Model
 {
     protected $fillable = ['name', 'icon', 'active'];
 
-    protected $casts = ['active' => 'boolean'];
+    protected $casts = ['active' => 'boolean', 'is_fixed' => 'boolean'];
 
-    protected $appends = ['is_fixed'];
-
-    public function getIsFixedAttribute(): bool
+    public function getIsFixedAttribute(mixed $value): bool
     {
-        return in_array($this->getRawOriginal('name') ?? $this->name, EnsureDefaultCourseActivities::NAMES, true);
+        return (bool) $value || in_array($this->getRawOriginal('name') ?? $this->name, EnsureDefaultCourseActivities::NAMES, true);
     }
 
     protected static function booted(): void
     {
-        static::updating(function (ActivityTemplate $template): void {
-            if ($template->is_fixed && ($template->isDirty('name') || ! $template->active)) {
-                throw ValidationException::withMessages(['activity_template' => 'Las seis actividades base fijas no se pueden renombrar ni desactivar.']);
-            }
-        });
         static::deleting(function (ActivityTemplate $template): void {
             if ($template->is_fixed) {
                 throw ValidationException::withMessages(['activity_template' => 'Las actividades base fijas no se pueden eliminar.']);

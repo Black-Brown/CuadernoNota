@@ -4,6 +4,7 @@ namespace App\Infrastructure\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class StudentEnrollment extends Model
 {
@@ -11,4 +12,5 @@ class StudentEnrollment extends Model
     protected $casts = ['enrolled_at' => 'date', 'ended_at' => 'date'];
     public function student(): BelongsTo { return $this->belongsTo(Student::class); }
     public function section(): BelongsTo { return $this->belongsTo(Section::class); }
+    public function promotionDecision(): HasOne { return $this->hasOne(PromotionDecision::class); }
 }

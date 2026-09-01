@@ -19,6 +19,7 @@ const menuItems = [
       { name: 'Catálogo académico', icon: 'account_tree', path: '/admin/catalog' },
       { name: 'Configuración institucional', icon: 'tune', path: '/admin/institutional' },
       { name: 'Asignaciones docentes', icon: 'assignment_ind', path: '/admin/assignments' },
+      { name: 'Asignación estudiantes', icon: 'group_add', path: '/admin/student-placements' },
       { name: 'Aprobación de notas', icon: 'fact_check', path: '/admin/reviews' },
       { name: 'Promoción escolar', icon: 'upgrade', path: '/admin/promotions' },
     ],

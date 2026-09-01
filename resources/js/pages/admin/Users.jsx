@@ -13,8 +13,8 @@ import SideDrawer from '../../components/ui/SideDrawer';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import FormField, { inputClass, selectClass } from '../../components/ui/FormField';
 import Toast from '../../components/ui/Toast';
+import { ADMIN_CREATABLE_ROLES, ROLE_LABELS } from '../../utils/adminAccess';
 
-const ROLE_LABELS = { teacher: 'Docente', coordinator: 'Coordinador', admin: 'Administrador' };
 const ROLE_TONES = { teacher: 'indigo', coordinator: 'info', admin: 'neutral' };
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'teacher', active: true };
 
@@ -175,7 +175,8 @@ export default function AdminUsers() {
               disabled={editingUser && isSelf(editingUser)}
               onChange={(e) => setForm({ ...form, role: e.target.value })}
             >
-              {Object.entries(ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {editingUser?.role === 'coordinator' && <option value="coordinator" disabled>Coordinador · Próximamente</option>}
+              {Object.entries(ADMIN_CREATABLE_ROLES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </FormField>
           {editingUser && (

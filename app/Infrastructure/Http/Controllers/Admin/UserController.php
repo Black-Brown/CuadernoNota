@@ -51,7 +51,11 @@ class UserController extends Controller
             throw ValidationException::withMessages(['user' => 'No puedes quitarte tu propio acceso administrativo.']);
         }
 
+        $wasActive = $user->active;
         $user->update($data);
+        if ($wasActive && ! $user->fresh()->active) {
+            $user->tokens()->delete();
+        }
         return response()->json($user->fresh());
     }
 
@@ -72,7 +76,7 @@ class UserController extends Controller
             'name' => [$sometimes, 'string', 'max:255'],
             'email' => [$sometimes, 'email', 'max:255', Rule::unique('users')->ignore($user?->id)],
             'password' => ['nullable', 'string', 'min:8'],
-            'role' => [$sometimes, Rule::in(['teacher', 'coordinator', 'admin'])],
+            'role' => [$sometimes, Rule::in($user?->role === 'coordinator' ? ['teacher', 'coordinator', 'admin'] : ['teacher', 'admin'])],
             'active' => ['sometimes', 'boolean'],
         ];
     }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Infrastructure\Http\Controllers\Admin\TeacherAssignmentController;
+use App\Infrastructure\Http\Controllers\Admin\StudentPlacementController;
 use App\Infrastructure\Http\Controllers\Admin\AcademicCatalogController;
 use App\Infrastructure\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Infrastructure\Http\Controllers\Admin\UserController as AdminUserController;
@@ -49,6 +50,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
             Route::get('/students', [AdminStudentController::class, 'index'])->name('students.index');
             Route::post('/students', [AdminStudentController::class, 'store'])->name('students.store');
+            Route::post('/students/import/preview', [AdminStudentController::class, 'previewImport'])->name('students.import.preview');
+            Route::post('/students/import', [AdminStudentController::class, 'import'])->name('students.import');
+            Route::get('/student-placements/pending', [StudentPlacementController::class, 'index'])->name('student-placements.pending');
+            Route::post('/student-placements', [StudentPlacementController::class, 'store'])->name('student-placements.store');
             Route::get('/students/{student}', [AdminStudentController::class, 'show'])->name('students.show');
             Route::patch('/students/{student}', [AdminStudentController::class, 'update'])->name('students.update');
             Route::post('/students/{student}/enrollments', [AdminStudentController::class, 'enroll'])->name('students.enroll');
@@ -59,6 +64,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/grade-reviews/decision', [GradeReviewController::class, 'decide'])->name('grade-reviews.decide');
 
             Route::get('/promotions/candidates', [PromotionController::class, 'candidates'])->name('promotions.candidates');
+            Route::post('/promotions/bulk-decision', [PromotionController::class, 'decideMany'])->name('promotions.bulk-decision');
             Route::post('/promotions/{studentEnrollment}/decision', [PromotionController::class, 'decide'])->name('promotions.decide');
 
             Route::get('/reports/academic', [ReportController::class, 'academic'])->name('reports.academic');

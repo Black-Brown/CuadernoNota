@@ -329,8 +329,8 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
                         <td className="px-6 py-3.5 text-right">
                           <button
                             onClick={() => { setEditingId(act.id); setEditingName(act.name); }}
-                            disabled={!act.active || isEditing || !canEditActivities}
-                            title="Renombrar"
+                            disabled={!act.active || isEditing || !canEditActivities || isBase}
+                            title={isBase ? 'Las actividades base conservan su nombre institucional' : 'Renombrar'}
                             className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span>

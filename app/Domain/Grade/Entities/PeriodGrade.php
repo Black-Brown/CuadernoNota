@@ -37,6 +37,7 @@ class PeriodGrade
         public readonly float  $periodScore,
         public readonly ?float $rpScore = null,
         public readonly string $status = 'draft',
+        public readonly ?int   $sectionId = null,
     ) {}
 
     /**

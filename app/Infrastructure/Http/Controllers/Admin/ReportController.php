@@ -15,14 +15,23 @@ class ReportController extends Controller
     {
         $yearId = $request->integer('academic_year_id') ?: DB::table('academic_years')->where('active', true)->value('id');
         $rows = DB::table('period_grades')->join('students', 'period_grades.student_id', '=', 'students.id')
-            ->join('sections', 'students.section_id', '=', 'sections.id')->join('grades', 'sections.grade_id', '=', 'grades.id')
+            ->join('sections', 'period_grades.section_id', '=', 'sections.id')->join('grades', 'sections.grade_id', '=', 'grades.id')
             ->join('subjects', 'period_grades.subject_id', '=', 'subjects.id')->join('periods', 'period_grades.period_id', '=', 'periods.id')
             ->where('periods.academic_year_id', $yearId)->where('period_grades.status', 'official')
             ->select('grades.name as grade', 'sections.name as section', 'subjects.name as subject', 'periods.name as period',
                 DB::raw('COUNT(*) as students'), DB::raw('ROUND(AVG(COALESCE(period_grades.rp_score, period_grades.period_score)), 2) as average'),
                 DB::raw('SUM(CASE WHEN COALESCE(period_grades.rp_score, period_grades.period_score) < 70 THEN 1 ELSE 0 END) as at_risk'))
             ->groupBy('grades.name', 'sections.name', 'subjects.name', 'periods.name')->orderBy('grades.name')->get();
-        return response()->json(['academic_year_id' => $yearId, 'rows' => $rows]);
+        $summary = DB::table('period_grades')
+            ->join('periods', 'period_grades.period_id', '=', 'periods.id')
+            ->where('periods.academic_year_id', $yearId)
+            ->where('period_grades.status', 'official')
+            ->selectRaw('COUNT(DISTINCT period_grades.student_id) as evaluated_students')
+            ->selectRaw('COUNT(DISTINCT CASE WHEN COALESCE(period_grades.rp_score, period_grades.period_score) < 70 THEN period_grades.student_id END) as at_risk_students')
+            ->selectRaw('ROUND(AVG(COALESCE(period_grades.rp_score, period_grades.period_score)), 2) as overall_average')
+            ->first();
+
+        return response()->json(['academic_year_id' => $yearId, 'summary' => $summary, 'rows' => $rows]);
     }
 
     public function attendance(Request $request): JsonResponse
@@ -30,7 +39,7 @@ class ReportController extends Controller
         $yearId = $request->integer('academic_year_id') ?: DB::table('academic_years')->where('active', true)->value('id');
         return response()->json(DB::table('attendances')->join('sections', 'attendances.section_id', '=', 'sections.id')->join('grades', 'sections.grade_id', '=', 'grades.id')
             ->where('sections.academic_year_id', $yearId)->select('grades.name as grade', 'sections.name as section',
-                DB::raw('COUNT(*) as records'), DB::raw("SUM(CASE WHEN code = 'P' THEN 1 ELSE 0 END) as present"),
+                DB::raw('COUNT(*) as records'), DB::raw("SUM(CASE WHEN code IN ('P', 'T') THEN 1 ELSE 0 END) as present"),
                 DB::raw("SUM(CASE WHEN code = 'A' THEN 1 ELSE 0 END) as absent"), DB::raw("SUM(CASE WHEN code = 'T' THEN 1 ELSE 0 END) as late"),
                 DB::raw("SUM(CASE WHEN code = 'E' THEN 1 ELSE 0 END) as excused"))
             ->groupBy('grades.name', 'sections.name')->orderBy('grades.name')->get());
@@ -52,7 +61,16 @@ class ReportController extends Controller
             echo "{\n\"generated_at\":".json_encode(now()->toIso8601String()).",\n\"tables\":{";
             foreach ($tables as $index => $table) {
                 if ($index) echo ',';
-                echo "\n".json_encode($table).':'.json_encode(DB::table($table)->get(), JSON_UNESCAPED_UNICODE);
+                $query = DB::table($table);
+
+                if ($table === 'users') {
+                    $query->select([
+                        'id', 'name', 'email', 'email_verified_at', 'role', 'active',
+                        'last_login', 'created_at', 'updated_at',
+                    ]);
+                }
+
+                echo "\n".json_encode($table).':'.json_encode($query->get(), JSON_UNESCAPED_UNICODE);
             }
             echo "\n}}";
         }, 'cuaderno-nota-backup-'.now()->format('Ymd-His').'.json', ['Content-Type' => 'application/json']);

@@ -138,6 +138,28 @@ class TeacherAssignmentController extends Controller
             'active' => ['sometimes', 'boolean'],
         ]);
 
+        $teacher = $teacherAssignment->teacher;
+        if (($data['active'] ?? $teacherAssignment->active) && ($teacher->role !== 'teacher' || ! $teacher->active)) {
+            throw ValidationException::withMessages([
+                'active' => 'No se puede activar una asignación de un profesor inactivo.',
+            ]);
+        }
+
+        if (isset($data['course_offering_id'])) {
+            $courseIsActive = DB::table('course_offerings')
+                ->join('subjects', 'subjects.id', '=', 'course_offerings.subject_id')
+                ->where('course_offerings.id', $data['course_offering_id'])
+                ->where('course_offerings.active', true)
+                ->where('subjects.active', true)
+                ->exists();
+
+            if (! $courseIsActive) {
+                throw ValidationException::withMessages([
+                    'course_offering_id' => 'El curso seleccionado debe estar activo.',
+                ]);
+            }
+        }
+
         $teacherAssignment->update($data);
 
         return response()->json($teacherAssignment->fresh());

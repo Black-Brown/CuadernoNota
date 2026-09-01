@@ -57,12 +57,14 @@ class AcademicCatalogController extends Controller
     public function storePeriod(Request $request, AcademicYear $academicYear): JsonResponse
     {
         $data = $request->validate($this->periodRules($academicYear));
+        $this->assertValidPeriodCalendar($academicYear, $data);
         return response()->json($academicYear->periods()->create($data), 201);
     }
 
     public function updatePeriod(Request $request, Period $period): JsonResponse
     {
         $data = $request->validate($this->periodRules($period->academicYear, $period));
+        $this->assertValidPeriodCalendar($period->academicYear, $data, $period);
         $period->update($data);
         return response()->json($period->fresh());
     }
@@ -136,9 +138,16 @@ class AcademicCatalogController extends Controller
 
     public function storeSection(Request $request): JsonResponse
     {
+        $request->merge([
+            'name' => mb_strtoupper(trim((string) $request->input('name'))),
+            'shift' => trim((string) $request->input('shift')),
+        ]);
         $data = $request->validate($this->sectionRules());
         $periodId = $data['period_id'] ?? null;
         unset($data['period_id']);
+        $data['name'] = mb_strtoupper(trim($data['name']));
+        $data['shift'] = trim($data['shift']);
+        $this->assertUniqueSection($data);
         $this->assertPeriodOpenForLock($periodId);
         $section = DB::transaction(function () use ($data) {
             $section = Section::create($data);
@@ -151,9 +160,21 @@ class AcademicCatalogController extends Controller
 
     public function updateSection(Request $request, Section $section): JsonResponse
     {
+        $request->merge(array_filter([
+            'name' => $request->has('name') ? mb_strtoupper(trim((string) $request->input('name'))) : null,
+            'shift' => $request->has('shift') ? trim((string) $request->input('shift')) : null,
+        ], fn ($value) => $value !== null));
         $data = $request->validate($this->sectionRules($section));
         $periodId = $data['period_id'] ?? null;
         unset($data['period_id']);
+        if (isset($data['name'])) $data['name'] = mb_strtoupper(trim($data['name']));
+        if (isset($data['shift'])) $data['shift'] = trim($data['shift']);
+        $this->assertUniqueSection([
+            'academic_year_id' => $data['academic_year_id'] ?? $section->academic_year_id,
+            'grade_id' => $data['grade_id'] ?? $section->grade_id,
+            'name' => $data['name'] ?? $section->name,
+            'shift' => $data['shift'] ?? $section->shift,
+        ], $section);
         $this->assertPeriodOpenForLock($periodId);
         $section->update($data);
         return response()->json($section->fresh(['grade', 'academicYear']));
@@ -271,12 +292,53 @@ class AcademicCatalogController extends Controller
         throw ValidationException::withMessages(['resource' => $message]);
     }
 
+    private function assertUniqueSection(array $data, ?Section $section = null): void
+    {
+        $duplicate = Section::query()
+            ->where('academic_year_id', $data['academic_year_id'])
+            ->where('grade_id', $data['grade_id'])
+            ->where('name', $data['name'])
+            ->where('shift', $data['shift'])
+            ->when($section, fn ($query) => $query->where('id', '!=', $section->id))
+            ->exists();
+
+        if ($duplicate) {
+            throw ValidationException::withMessages([
+                'name' => 'Ya existe una sección con el mismo año escolar, grado, nombre y tanda.',
+            ]);
+        }
+    }
+
     private function assertPeriodOpenForLock(?int $periodId): void
     {
         if (!$periodId) return;
         $period = Period::find($periodId);
         if ($period && $period->status !== 'open') {
             $this->inUse('El período seleccionado está cerrado; no se pueden modificar secciones dentro de este workspace.');
+        }
+    }
+
+    private function assertValidPeriodCalendar(AcademicYear $year, array $data, ?Period $period = null): void
+    {
+        $yearStart = $year->start_date->toDateString();
+        $yearEnd = $year->end_date->toDateString();
+
+        if ($data['start_date'] < $yearStart || $data['end_date'] > $yearEnd) {
+            throw ValidationException::withMessages([
+                'start_date' => "El período debe estar comprendido entre {$yearStart} y {$yearEnd}.",
+            ]);
+        }
+
+        $overlaps = $year->periods()
+            ->when($period, fn ($query) => $query->where('id', '!=', $period->id))
+            ->whereDate('start_date', '<=', $data['end_date'])
+            ->whereDate('end_date', '>=', $data['start_date'])
+            ->exists();
+
+        if ($overlaps) {
+            throw ValidationException::withMessages([
+                'start_date' => 'Las fechas del período se superponen con otro período del mismo año escolar.',
+            ]);
         }
     }
 
@@ -296,11 +358,24 @@ class AcademicCatalogController extends Controller
         'name' => [$grade ? 'sometimes' : 'required', 'string', 'max:30', Rule::unique('grades')->ignore($grade?->id)],
         'level' => [$grade ? 'sometimes' : 'required', 'string', 'max:20'], 'sort_order' => [$grade ? 'sometimes' : 'required', 'integer', 'between:1,127'],
     ]; }
-    private function sectionRules(?Section $section = null): array { return [
+    private function sectionRules(?Section $section = null): array
+    {
+        $academicYearId = request()->input('academic_year_id', $section?->academic_year_id);
+        $gradeId = request()->input('grade_id', $section?->grade_id);
+        $shift = trim((string) request()->input('shift', $section?->shift));
+
+        return [
         'grade_id' => [$section ? 'sometimes' : 'required', 'exists:grades,id'], 'academic_year_id' => [$section ? 'sometimes' : 'required', 'exists:academic_years,id'],
-        'name' => [$section ? 'sometimes' : 'required', 'string', 'max:5'], 'shift' => [$section ? 'sometimes' : 'required', 'string', 'max:15'],
+        'name' => [
+            $section ? 'sometimes' : 'required', 'string', 'max:5',
+            Rule::unique('sections', 'name')
+                ->where(fn ($query) => $query->where('academic_year_id', $academicYearId)->where('grade_id', $gradeId)->where('shift', $shift))
+                ->ignore($section?->id),
+        ],
+        'shift' => [$section ? 'sometimes' : 'required', 'string', 'max:15'],
         'period_id' => ['nullable', 'exists:periods,id'],
-    ]; }
+        ];
+    }
     private function subjectRules(?Subject $subject = null): array { return [
         'name' => [$subject ? 'sometimes' : 'required', 'string', 'max:60', Rule::unique('subjects')->ignore($subject?->id)],
         'code' => [$subject ? 'sometimes' : 'required', 'string', 'max:10', Rule::unique('subjects')->ignore($subject?->id)],

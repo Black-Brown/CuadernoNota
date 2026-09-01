@@ -375,7 +375,8 @@ class BigSeed extends Seeder
 
                 DB::table('period_grades')->updateOrInsert(
                     ['student_id' => $studId, 'subject_id' => $subId, 'period_id' => $p1],
-                    ['c1_score' => $c1, 'c2_score' => $c2, 'c3_score' => $c3,
+                    ['section_id' => DB::table('students')->where('id', $studId)->value('section_id'),
+                     'c1_score' => $c1, 'c2_score' => $c2, 'c3_score' => $c3,
                      'period_score' => $ps, 'rp_score' => $rp, 'status' => 'official',
                      'created_at' => now(), 'updated_at' => now()]
                 );

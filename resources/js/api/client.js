@@ -4,7 +4,6 @@ const api = axios.create({
   // Use the same host that served the frontend. This avoids mixing
   // localhost and 127.0.0.1 during local development.
   baseURL: import.meta.env.VITE_API_URL || '/api',
-  headers: { 'Content-Type': 'application/json' },
 });
 
 api.interceptors.request.use((config) => {
