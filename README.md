@@ -243,8 +243,8 @@ Objetivo: **frontend en Vercel, API en Render/Railway (o un servidor PHP propio)
 2. `APP_ENV=production`, `APP_DEBUG=false`, `APP_KEY` generado con `php artisan key:generate --show`.
 3. `APP_URL` con el dominio real de la API; `FRONTEND_URL` y `CORS_ALLOWED_ORIGINS` con el dominio real de Vercel (deben coincidir exactamente, incluyendo `https://` y sin barra final).
 4. `GOOGLE_REDIRECT_URI` con la URI de callback de producción, registrada también en Google Cloud Console.
-5. Si despliegas con el `Dockerfile` de `api/`: su `CMD` invoca el servidor embebido de PHP directamente (no `php artisan serve`, que descarta variables de entorno reales en favor de `.env` — ver comentario en el `Dockerfile`). Aun así, el servidor embebido de PHP no es apto para tráfico de producción alto según la propia documentación de PHP; si la plataforma ofrece un runtime nativo de PHP (PHP-FPM + Nginx), suele ser preferible a este `Dockerfile`.
-6. Ejecuta migraciones (`php artisan migrate --force`) como parte del despliegue.
+5. El `Dockerfile` de `api/` ejecuta Nginx y PHP-FPM mediante Supervisor. Nginx escucha el `$PORT` dinámico de la plataforma y PHP-FPM inicia cuatro workers para atender solicitudes concurrentes.
+6. El arranque comprueba PostgreSQL, ejecuta `php artisan migrate --force`, genera la caché de configuración en producción y habilita OPcache antes de publicar el servicio.
 
 ### Frontend (Vercel)
 

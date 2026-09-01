@@ -6,7 +6,11 @@ if [ ! -f .env ] && [ "${APP_ENV:-local}" != "production" ]; then
 fi
 
 if [ ! -f vendor/autoload.php ]; then
-    composer install --no-interaction --prefer-dist
+    if [ "${APP_ENV:-local}" = "production" ]; then
+        composer install --classmap-authoritative --no-dev --no-interaction --prefer-dist
+    else
+        composer install --no-interaction --prefer-dist
+    fi
 fi
 
 # A real APP_KEY env var (e.g. set on Render/Railway) always wins over .env and makes
@@ -35,5 +39,13 @@ done
 
 php artisan migrate --force
 php artisan optimize:clear
+
+if [ "${APP_ENV:-local}" = "production" ]; then
+    php artisan config:cache
+fi
+
+export PORT="${PORT:-8000}"
+envsubst '${PORT}' < docker/nginx.conf.template > /etc/nginx/conf.d/default.conf
+nginx -t
 
 exec "$@"
