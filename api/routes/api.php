@@ -56,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/student-placements', [StudentPlacementController::class, 'store'])->name('student-placements.store');
             Route::get('/students/{student}', [AdminStudentController::class, 'show'])->name('students.show');
             Route::patch('/students/{student}', [AdminStudentController::class, 'update'])->name('students.update');
+            Route::delete('/students/{student}', [AdminStudentController::class, 'destroy'])->name('students.destroy');
             Route::post('/students/{student}/enrollments', [AdminStudentController::class, 'enroll'])->name('students.enroll');
             Route::post('/students/{student}/deactivate', [AdminStudentController::class, 'deactivate'])->name('students.deactivate');
 

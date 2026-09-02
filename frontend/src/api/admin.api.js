@@ -18,6 +18,7 @@ export const getAdminStudents = (params = {}) => api.get('/admin/students', { pa
 export const getAdminStudent = id => api.get(`/admin/students/${id}`).then(r => r.data);
 export const createAdminStudent = data => api.post('/admin/students', data).then(r => r.data);
 export const updateAdminStudent = (id, data) => api.patch(`/admin/students/${id}`, data).then(r => r.data);
+export const deleteAdminStudent = (id, confirmation) => api.delete(`/admin/students/${id}`, { data: { confirmation } }).then(r => r.data);
 export const enrollStudent = (id, data) => api.post(`/admin/students/${id}/enrollments`, data).then(r => r.data);
 export const deactivateStudent = (id, data) => api.post(`/admin/students/${id}/deactivate`, data).then(r => r.data);
 const studentCsvForm = file => { const data = new FormData(); data.append('file', file); return data; };
