@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { deactivateStudent, enrollStudent, getAdminStudent, getSections } from '../../api/admin.api';
+import { enrollStudent, getAdminStudent, getSections } from '../../api/admin.api';
 import useToast from '../../hooks/useToast';
 import { getErrorMessage } from '../../utils/apiError';
 import PageHeader from '../../components/ui/PageHeader';
 import StatusBadge from '../../components/ui/StatusBadge';
 import SideDrawer from '../../components/ui/SideDrawer';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import StudentActions from '../../components/admin/StudentActions';
 import FormField, { inputClass, selectClass } from '../../components/ui/FormField';
 import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
 import EmptyState from '../../components/ui/EmptyState';
@@ -49,8 +49,6 @@ export default function StudentProfile() {
   const [enrollOpen, setEnrollOpen] = useState(false);
   const [enrollForm, setEnrollForm] = useState({ section_id: '', enrolled_at: '' });
   const [enrollError, setEnrollError] = useState('');
-  const [deactivateOpen, setDeactivateOpen] = useState(false);
-  const [reason, setReason] = useState('');
   const [activeTab, setActiveTab] = useState('summary');
 
   const { data: student, isLoading } = useQuery({ queryKey: ['admin-student', id], queryFn: () => getAdminStudent(id) });
@@ -67,18 +65,6 @@ export default function StudentProfile() {
     onError: (err) => setEnrollError(getErrorMessage(err)),
   });
 
-  const deactivateMutation = useMutation({
-    mutationFn: () => deactivateStudent(id, { reason }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-student', id] });
-      qc.invalidateQueries({ queryKey: ['admin-students'] });
-      setDeactivateOpen(false);
-      setReason('');
-      showToast('Estudiante dado de baja; su historial fue conservado.');
-    },
-    onError: (err) => showToast(getErrorMessage(err), 'error'),
-  });
-
   if (isLoading) return <LoadingSkeleton />;
   if (!student) return <EmptyState icon="person_off" title="Estudiante no encontrado" />;
 
@@ -92,7 +78,7 @@ export default function StudentProfile() {
         title={`${student.name} ${student.last_name}`}
         description={`Matrícula ${student.enrollment_no}`}
         actions={
-          <>
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               onClick={() => {
                 if (!currentEnrollment) { navigate(`/admin/student-placements?student=${student.id}`); return; }
@@ -103,16 +89,13 @@ export default function StudentProfile() {
               <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
               {currentEnrollment ? 'Cambiar sección' : 'Asignar sección'}
             </button>
-            {student.active && (
-              <button
-                onClick={() => setDeactivateOpen(true)}
-                className="flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50"
-              >
-                <span className="material-symbols-outlined text-[18px]">person_off</span>
-                Dar de baja
-              </button>
-            )}
-          </>
+            <StudentActions
+              student={student}
+              showLabels
+              onSuccess={showToast}
+              onDeleted={() => navigate('/admin/students', { replace: true, state: { studentActionMessage: 'Estudiante eliminado definitivamente.' } })}
+            />
+          </div>
         }
       />
 
@@ -242,22 +225,6 @@ export default function StudentProfile() {
           </FormField>
         </div>
       </SideDrawer>
-
-      <ConfirmDialog
-        open={deactivateOpen}
-        onClose={() => setDeactivateOpen(false)}
-        onConfirm={() => deactivateMutation.mutate()}
-        loading={deactivateMutation.isPending}
-        disableConfirm={!reason.trim()}
-        tone="danger"
-        title="Dar de baja al estudiante"
-        message="Su historial académico y matrículas se conservarán intactos."
-        confirmLabel="Dar de baja"
-      >
-        <FormField label="Motivo de la baja" required>
-          <textarea rows={3} className={inputClass} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej. Traslado a otro centro educativo" />
-        </FormField>
-      </ConfirmDialog>
 
       <Toast toast={toast} />
     </>

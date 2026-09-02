@@ -157,19 +157,10 @@ class AdminStudentWorkflowTest extends TestCase
             'grade_id' => $gradeId, 'academic_year_id' => $yearId, 'name' => 'A',
             'shift' => 'Matutina', 'created_at' => now(), 'updated_at' => now(),
         ]);
-        $invalidCsv = implode("\n", [
-            'MATRICULA,NOMBRES,APELLIDOS,ANO_ESCOLAR,GRADO,SECCION,TANDA,FECHA_INSCRIPCION',
-            'FUERA-001,Fecha,Fuera,2025-2026,1RO SECUNDARIA,A,Matutina,2026-07-15',
-        ]);
-        $this->postJson('/api/admin/students/import/preview', [
-            'file' => UploadedFile::fake()->createWithContent('fuera.csv', $invalidCsv),
-        ])->assertOk()
-            ->assertJsonPath('summary.invalid', 1)
-            ->assertJsonPath('rows.0.valid', false);
         $csv = implode("\n", [
-            'MATRICULA,NOMBRES,APELLIDOS,ANO_ESCOLAR,GRADO,SECCION,TANDA,FECHA_INSCRIPCION,NOMBRE_TUTOR',
-            '2025-1SA-0001,Ana María,Pérez Soto,2025-2026,1RO SECUNDARIA,A,Matutina,2025-08-01,',
-            '2025-1SA-0002,Juan,De la Cruz,2025-2026,1RO SECUNDARIA,A,Matutina,2025-08-01,',
+            'MATRICULA,NOMBRES,APELLIDOS',
+            '2025-1SA-0001,Ana María,Pérez Soto',
+            '2025-1SA-0002,Juan,De la Cruz',
         ]);
 
         $this->postJson('/api/admin/students/import/preview', [
@@ -178,7 +169,7 @@ class AdminStudentWorkflowTest extends TestCase
             ->assertJsonPath('summary.total', 2)
             ->assertJsonPath('summary.valid', 2)
             ->assertJsonPath('summary.invalid', 0)
-            ->assertJsonPath('rows.0.section_id', $sectionId)
+            ->assertJsonPath('rows.0.section_id', null)
             ->assertJsonPath('rows.0.data.name', 'Ana María');
 
         $this->postJson('/api/admin/students/import', [
@@ -187,8 +178,17 @@ class AdminStudentWorkflowTest extends TestCase
 
         $this->assertDatabaseHas('students', [
             'enrollment_no' => '2025-1SA-0001', 'name' => 'Ana María', 'last_name' => 'Pérez Soto',
-            'section_id' => $sectionId, 'academic_year_id' => $yearId, 'active' => true,
+            'section_id' => null, 'academic_year_id' => null, 'active' => true,
         ]);
+        $this->assertDatabaseCount('student_enrollments', 0);
+        $studentIds = DB::table('students')->pluck('id')->all();
+        $this->postJson('/api/admin/student-placements', [
+            'student_ids' => $studentIds, 'section_id' => $sectionId, 'enrolled_at' => '2026-07-15',
+        ])->assertUnprocessable()->assertJsonValidationErrors('enrolled_at');
+        $this->assertDatabaseCount('student_enrollments', 0);
+        $this->postJson('/api/admin/student-placements', [
+            'student_ids' => $studentIds, 'section_id' => $sectionId, 'enrolled_at' => '2025-08-01',
+        ])->assertCreated()->assertJsonPath('assigned', 2);
         $this->assertSame(2, DB::table('student_enrollments')->where('section_id', $sectionId)->where('status', 'active')->count());
 
         $this->postJson('/api/admin/students/import/preview', [

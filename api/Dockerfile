@@ -33,6 +33,7 @@ RUN composer install \
 COPY . .
 RUN cp docker/php-fpm.conf /usr/local/etc/php-fpm.d/zz-app.conf \
     && cp docker/opcache.ini /usr/local/etc/php/conf.d/zz-opcache.ini \
+    && cp docker/uploads.ini /usr/local/etc/php/conf.d/zz-uploads.ini \
     && cp docker/supervisord.conf /etc/supervisor/supervisord.conf \
     && composer dump-autoload --classmap-authoritative --no-dev \
     && chmod +x docker/entrypoint.sh \

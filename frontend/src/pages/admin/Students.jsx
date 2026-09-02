@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createAdminStudent, getAdminStudents } from '../../api/admin.api';
 import useToast from '../../hooks/useToast';
@@ -13,12 +13,14 @@ import SideDrawer from '../../components/ui/SideDrawer';
 import FormField, { inputClass, selectClass } from '../../components/ui/FormField';
 import Toast from '../../components/ui/Toast';
 import StudentImportDrawer from '../../components/admin/StudentImportDrawer';
+import StudentActions from '../../components/admin/StudentActions';
 
 const EMPTY_FORM = { name: '', last_name: '', enrollment_no: '' };
 
 export default function AdminStudents() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast, showToast } = useToast();
 
   const [search, setSearch] = useState('');
@@ -26,6 +28,7 @@ export default function AdminStudents() {
   const [page, setPage] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [importedCount, setImportedCount] = useState(0);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
 
@@ -35,6 +38,16 @@ export default function AdminStudents() {
 
   const { data, isLoading } = useQuery({ queryKey: ['admin-students', params], queryFn: () => getAdminStudents(params) });
   const students = data?.data || [];
+
+  useEffect(() => {
+    if (data?.last_page && page > data.last_page) setPage(data.last_page);
+  }, [data?.last_page, page]);
+
+  useEffect(() => {
+    if (!location.state?.studentActionMessage) return;
+    showToast(location.state.studentActionMessage);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate, showToast]);
 
   const createMutation = useMutation({
     mutationFn: createAdminStudent,
@@ -74,6 +87,11 @@ export default function AdminStudents() {
         </select>
       </FilterBar>
 
+      {importedCount > 0 && <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+        <div><p className="font-bold">{importedCount} {importedCount === 1 ? 'estudiante registrado' : 'estudiantes registrados'} correctamente</p><p className="mt-1 text-xs">Registro completado. El siguiente paso es la asignación a una sección.</p></div>
+        <Link to="/admin/student-placements" className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-bold hover:bg-emerald-100">Asignar estudiantes <span aria-hidden="true" className="material-symbols-outlined text-[18px]">arrow_forward</span></Link>
+      </div>}
+
       <DataTable
         loading={isLoading}
         rows={students}
@@ -86,6 +104,7 @@ export default function AdminStudents() {
           { key: 'section', label: 'Grado / Sección', render: (s) => s.section ? `${s.section.grade?.name} ${s.section.name}` : <span className="font-semibold text-amber-600">Pendiente de asignación</span> },
           { key: 'year', label: 'Año escolar', render: (s) => s.section?.academic_year?.name || '—' },
           { key: 'active', label: 'Estado', align: 'center', render: (s) => <StatusBadge tone={!s.active ? 'neutral' : s.section ? 'success' : 'warning'} label={!s.active ? 'Inactivo' : s.section ? 'Inscrito' : 'Pendiente'} /> },
+          { key: 'actions', label: 'Acciones', align: 'right', render: (s) => <StudentActions student={s} onSuccess={showToast} /> },
         ]}
       />
 
@@ -134,6 +153,11 @@ export default function AdminStudents() {
 
       <StudentImportDrawer open={importOpen} onClose={() => setImportOpen(false)} onImported={(result) => {
         qc.invalidateQueries({ queryKey: ['admin-students'] });
+        qc.invalidateQueries({ queryKey: ['admin-student-placements'] });
+        setImportedCount(result.imported);
+        setSearch('');
+        setActive('');
+        setPage(1);
         setImportOpen(false);
         showToast(result.message || `${result.imported} estudiantes importados correctamente.`);
       }} />
