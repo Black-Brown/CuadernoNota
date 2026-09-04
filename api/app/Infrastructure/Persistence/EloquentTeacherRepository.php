@@ -16,9 +16,18 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
 {
     public function findCoursesByTeacher(int $teacherId): array
     {
-        return TeacherSectionModel::where('user_id', $teacherId)
+        $courses = TeacherSectionModel::where('user_id', $teacherId)
             ->with(['section.grade', 'subject', 'academicYear'])
-            ->get()
+            ->get();
+
+        $studentCounts = StudentModel::query()
+            ->whereIn('section_id', $courses->pluck('section_id')->unique())
+            ->where('active', true)
+            ->selectRaw('section_id, COUNT(*) as students_count')
+            ->groupBy('section_id')
+            ->pluck('students_count', 'section_id');
+
+        return $courses
             ->map(fn($ts) => [
                 'section_id'       => $ts->section_id,
                 'subject_id'       => $ts->subject_id,
@@ -27,6 +36,10 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
                 'section_name'     => $ts->section?->name ?? '',
                 'subject_name'     => $ts->subject?->name ?? '',
                 'year_label'       => $ts->academicYear?->name ?? '',
+                // teacher_sections is a compatibility view that only exposes
+                // active teacher assignments backed by active course offerings.
+                'status'           => 'active',
+                'students_count'   => (int) ($studentCounts[$ts->section_id] ?? 0),
             ])
             ->all();
     }

@@ -9,7 +9,7 @@ interface TeacherRepositoryInterface
     /**
      * Devuelve los cursos (sección + asignatura) asignados al docente.
      *
-     * @return array [['section_id', 'subject_id', 'academic_year_id', 'grade_name', 'section_name', 'subject_name'], ...]
+     * @return array [['section_id', 'subject_id', 'academic_year_id', 'grade_name', 'section_name', 'subject_name', 'status', 'students_count'], ...]
      */
     public function findCoursesByTeacher(int $teacherId): array;
 
