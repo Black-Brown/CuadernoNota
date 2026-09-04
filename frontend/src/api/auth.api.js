@@ -11,3 +11,6 @@ export const logout = () =>
 
 export const me = () =>
   api.get('/auth/me').then((r) => r.data);
+
+export const forgotPassword = (email) =>
+  api.post('/auth/forgot-password', { email }).then((r) => r.data);
