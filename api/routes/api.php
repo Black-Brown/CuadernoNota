@@ -1,23 +1,23 @@
 <?php
 
-use App\Infrastructure\Http\Controllers\Admin\TeacherAssignmentController;
-use App\Infrastructure\Http\Controllers\Admin\StudentPlacementController;
 use App\Infrastructure\Http\Controllers\Admin\AcademicCatalogController;
 use App\Infrastructure\Http\Controllers\Admin\DashboardController as AdminDashboardController;
-use App\Infrastructure\Http\Controllers\Admin\UserController as AdminUserController;
-use App\Infrastructure\Http\Controllers\Admin\StudentController as AdminStudentController;
 use App\Infrastructure\Http\Controllers\Admin\GradeReviewController;
 use App\Infrastructure\Http\Controllers\Admin\PromotionController;
 use App\Infrastructure\Http\Controllers\Admin\ReportController;
+use App\Infrastructure\Http\Controllers\Admin\StudentController as AdminStudentController;
+use App\Infrastructure\Http\Controllers\Admin\StudentPlacementController;
 use App\Infrastructure\Http\Controllers\Admin\SystemDataController;
+use App\Infrastructure\Http\Controllers\Admin\TeacherAssignmentController;
+use App\Infrastructure\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Infrastructure\Http\Controllers\AuthController;
-use App\Infrastructure\Http\Controllers\GoogleAuthController;
 use App\Infrastructure\Http\Controllers\Docente\ActivityController;
 use App\Infrastructure\Http\Controllers\Docente\AttendanceController;
 use App\Infrastructure\Http\Controllers\Docente\DashboardController;
 use App\Infrastructure\Http\Controllers\Docente\GradeController;
 use App\Infrastructure\Http\Controllers\Docente\ObservationController;
 use App\Infrastructure\Http\Controllers\Docente\RiskController;
+use App\Infrastructure\Http\Controllers\GoogleAuthController;
 use Illuminate\Support\Facades\Route;
 
 // ── Rutas públicas ────────────────────────────────────────────────────────────
@@ -49,9 +49,12 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::delete('/users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');
 
             Route::get('/students', [AdminStudentController::class, 'index'])->name('students.index');
+            Route::get('/students/workspaces', [AdminStudentController::class, 'workspaces'])->name('students.workspaces');
             Route::post('/students', [AdminStudentController::class, 'store'])->name('students.store');
             Route::post('/students/import/preview', [AdminStudentController::class, 'previewImport'])->name('students.import.preview');
             Route::post('/students/import', [AdminStudentController::class, 'import'])->name('students.import');
+            Route::post('/students/bulk-replace/preview', [AdminStudentController::class, 'previewBulkReplace'])->name('students.bulk-replace.preview');
+            Route::post('/students/bulk-replace', [AdminStudentController::class, 'bulkReplace'])->name('students.bulk-replace');
             Route::get('/student-placements/pending', [StudentPlacementController::class, 'index'])->name('student-placements.pending');
             Route::post('/student-placements', [StudentPlacementController::class, 'store'])->name('student-placements.store');
             Route::get('/students/{student}', [AdminStudentController::class, 'show'])->name('students.show');
@@ -59,6 +62,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::delete('/students/{student}', [AdminStudentController::class, 'destroy'])->name('students.destroy');
             Route::post('/students/{student}/enrollments', [AdminStudentController::class, 'enroll'])->name('students.enroll');
             Route::post('/students/{student}/deactivate', [AdminStudentController::class, 'deactivate'])->name('students.deactivate');
+            Route::post('/students/{student}/reactivate', [AdminStudentController::class, 'reactivate'])->name('students.reactivate');
 
             Route::get('/grade-reviews', [GradeReviewController::class, 'index'])->name('grade-reviews.index');
             Route::get('/grade-reviews/{sectionId}/{subjectId}/{periodId}', [GradeReviewController::class, 'show'])->name('grade-reviews.show');

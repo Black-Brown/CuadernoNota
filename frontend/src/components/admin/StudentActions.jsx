@@ -1,7 +1,7 @@
 import React, { useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { deactivateStudent, deleteAdminStudent, updateAdminStudent } from '../../api/admin.api';
+import { deactivateStudent, deleteAdminStudent, reactivateStudent, updateAdminStudent } from '../../api/admin.api';
 import { getErrorMessage } from '../../utils/apiError';
 import SideDrawer from '../ui/SideDrawer';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -9,7 +9,7 @@ import FormField, { inputClass } from '../ui/FormField';
 
 const STUDENT_QUERY_KEYS = [
   'admin-students', 'admin-student', 'admin-student-placements', 'admin-dashboard',
-  'admin-sections', 'admin-promotion-candidates', 'courses', 'attendance',
+  'admin-sections', 'admin-promotion-candidates', 'admin-student-workspaces', 'courses', 'attendance',
 ];
 
 export default function StudentActions({ student, showLabels = false, onSuccess, onDeleted }) {
@@ -25,6 +25,7 @@ export default function StudentActions({ student, showLabels = false, onSuccess,
     mutationFn: ({ action: requestedAction, payload }) => {
       if (requestedAction === 'edit') return updateAdminStudent(student.id, payload);
       if (requestedAction === 'deactivate') return deactivateStudent(student.id, { reason: payload });
+      if (requestedAction === 'reactivate') return reactivateStudent(student.id);
       return deleteAdminStudent(student.id, payload);
     },
     onSuccess: (result, variables) => {
@@ -53,7 +54,9 @@ export default function StudentActions({ student, showLabels = false, onSuccess,
 
   const actions = [
     { key: 'edit', label: 'Editar', icon: 'edit', color: 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-600' },
-    { key: 'deactivate', label: 'Desactivar', icon: 'person_off', color: 'text-slate-600 hover:bg-amber-50 hover:text-amber-700', disabled: !student.active },
+    student.active
+      ? { key: 'deactivate', label: 'Desactivar', icon: 'person_off', color: 'text-slate-600 hover:bg-amber-50 hover:text-amber-700' }
+      : { key: 'reactivate', label: 'Reactivar', icon: 'person_add', color: 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' },
     { key: 'delete', label: 'Eliminar', icon: 'delete', color: 'text-red-500 hover:bg-red-50 hover:text-red-700' },
   ];
 
@@ -139,6 +142,20 @@ export default function StudentActions({ student, showLabels = false, onSuccess,
           <FormField htmlFor={`${formId}-confirmation`} label="Confirmar matrícula" required hint={`Escribe ${student.enrollment_no} exactamente para confirmar.`}>
             <input id={`${formId}-confirmation`} autoFocus autoComplete="off" disabled={mutation.isPending} className={inputClass} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
           </FormField>
+        </ConfirmDialog>
+
+        <ConfirmDialog
+          open={action === 'reactivate'}
+          onClose={close}
+          onConfirm={() => { setError(''); mutation.mutate({ action: 'reactivate' }); }}
+          loading={mutation.isPending}
+          tone="default"
+          title="Reactivar estudiante"
+          message={`Se reactivará el expediente de ${fullName}. Su historial anterior se conservará y quedará pendiente de asignación a una nueva sección.`}
+          confirmLabel="Reactivar"
+        >
+          {errorNotice}
+          <p className="text-xs leading-5 text-slate-500">La sección anterior no se restaurará automáticamente. Podrás asignarle una sección desde Gestión académica.</p>
         </ConfirmDialog>
       </>, document.body)}
     </div>
