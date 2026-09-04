@@ -17,6 +17,7 @@ import AdminLayout from './components/AdminLayout.jsx';
 import AdminDashboard from './pages/admin/Dashboard.jsx';
 import AdminUsers from './pages/admin/Users.jsx';
 import AdminStudents from './pages/admin/Students.jsx';
+import AdminStudentWorkspace from './pages/admin/StudentWorkspace.jsx';
 import AdminStudentProfile from './pages/admin/StudentProfile.jsx';
 import AdminCatalog from './pages/admin/Catalog.jsx';
 import AdminInstitutional from './pages/admin/Institutional.jsx';
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="students" element={<AdminStudents />} />
+            <Route path="students/workspaces/:workspaceId" element={<AdminStudentWorkspace />} />
             <Route path="students/:id" element={<AdminStudentProfile />} />
             <Route path="catalog" element={<AdminCatalog />} />
             <Route path="institutional" element={<AdminInstitutional />} />

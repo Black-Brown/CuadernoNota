@@ -15,12 +15,16 @@ export const deactivateAdminUser = id => api.delete(`/admin/users/${id}`).then(r
 
 // ── Estudiantes ──────────────────────────────────────────────────────────────
 export const getAdminStudents = (params = {}) => api.get('/admin/students', { params }).then(r => r.data);
+export const getStudentWorkspaces = (params = {}) => api.get('/admin/students/workspaces', { params }).then(r => r.data);
 export const getAdminStudent = id => api.get(`/admin/students/${id}`).then(r => r.data);
 export const createAdminStudent = data => api.post('/admin/students', data).then(r => r.data);
 export const updateAdminStudent = (id, data) => api.patch(`/admin/students/${id}`, data).then(r => r.data);
 export const deleteAdminStudent = (id, confirmation) => api.delete(`/admin/students/${id}`, { data: { confirmation } }).then(r => r.data);
 export const enrollStudent = (id, data) => api.post(`/admin/students/${id}/enrollments`, data).then(r => r.data);
 export const deactivateStudent = (id, data) => api.post(`/admin/students/${id}/deactivate`, data).then(r => r.data);
+export const reactivateStudent = id => api.post(`/admin/students/${id}/reactivate`).then(r => r.data);
+export const previewStudentBulkReplace = data => api.post('/admin/students/bulk-replace/preview', data).then(r => r.data);
+export const replaceStudentEnrollments = data => api.post('/admin/students/bulk-replace', data).then(r => r.data);
 const studentCsvForm = file => { const data = new FormData(); data.append('file', file); return data; };
 export const previewStudentImport = file => api.post('/admin/students/import/preview', studentCsvForm(file)).then(r => r.data);
 export const importStudentsCsv = file => api.post('/admin/students/import', studentCsvForm(file)).then(r => r.data);

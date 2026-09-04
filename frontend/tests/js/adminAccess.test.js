@@ -4,7 +4,7 @@ import {
   ADMIN_CREATABLE_ROLES,
   ROLE_LABELS,
   routeForRole,
-} from '../../resources/js/utils/adminAccess.js';
+} from '../../src/utils/adminAccess.js';
 
 test('cada rol entra en una ruta existente o informativa', () => {
   assert.equal(routeForRole('admin'), '/admin/dashboard');
