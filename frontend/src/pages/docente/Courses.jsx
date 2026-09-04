@@ -65,10 +65,17 @@ function subjectMeta(subjectName = '') {
   };
 }
 
-function statusMeta(index) {
-  return index % 3 === 0
+function statusMeta(status) {
+  return status === 'active'
     ? { label: 'Activo', className: 'bg-emerald-50 text-emerald-700 border-emerald-100' }
-    : { label: 'Borrador', className: 'bg-slate-100 text-slate-600 border-slate-200' };
+    : { label: 'Inactivo', className: 'bg-slate-100 text-slate-600 border-slate-200' };
+}
+
+function uniqueStudentTotal(courses) {
+  return [...new Map(courses.map((course) => [
+    Number(course.section_id),
+    Number(course.students_count || 0),
+  ])).values()].reduce((total, count) => total + count, 0);
 }
 
 export default function Courses() {
@@ -84,8 +91,8 @@ export default function Courses() {
   });
 
   const rawCourses = data?.courses || [];
-  const activeCourses = summaryData?.active_courses ?? rawCourses.length;
-  const totalStudents = summaryData?.total_students ?? rawCourses.length * 30;
+  const activeCourses = summaryData?.active_courses ?? rawCourses.filter((course) => course.status === 'active').length;
+  const totalStudents = summaryData?.total_students ?? uniqueStudentTotal(rawCourses);
   const avgGrade = summaryData?.avg_grade ?? null;
   const attendanceAvg = summaryData?.attendance_avg ?? null;
 
@@ -134,9 +141,9 @@ export default function Courses() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {rawCourses.map((course, index) => {
+          {rawCourses.map((course) => {
             const meta = subjectMeta(course.subject_name);
-            const status = statusMeta(index);
+            const status = statusMeta(course.status);
 
             return (
               <Link
@@ -172,7 +179,7 @@ export default function Courses() {
                   <div className="mb-4 grid grid-cols-3 gap-2 border-y border-slate-100 py-4 text-center">
                     <div>
                       <p className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400">Estudiantes</p>
-                      <p className="mt-1 text-sm font-bold text-slate-800">30</p>
+                      <p className="mt-1 text-sm font-bold text-slate-800">{course.students_count ?? 0}</p>
                     </div>
                     <div>
                       <p className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400">Año</p>
