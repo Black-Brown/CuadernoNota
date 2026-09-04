@@ -1,5 +1,7 @@
 {
     "$schema": "https://www.schemastore.org/package.json",
+    "name": "cuaderno-nota-frontend",
+    "version": "1.0.0",
     "private": true,
     "type": "module",
     "scripts": {

@@ -71,8 +71,10 @@ class AuthController extends Controller
 
     public function forgotPassword(Request $request): JsonResponse
     {
+        // No usar exists:users,email aquí: revelaría si un correo está
+        // registrado o no. El mensaje debe ser el mismo exista o no.
         $request->validate([
-            'email' => 'required|email|exists:users,email',
+            'email' => 'required|email',
         ]);
 
         return response()->json([

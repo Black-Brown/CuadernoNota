@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { exchangeGoogleCode, login } from '../../api/auth.api';
+import { exchangeGoogleCode, forgotPassword, login } from '../../api/auth.api';
 import useAuthStore from '../../store/authStore';
 import { routeForRole } from '../../utils/adminAccess';
+import packageJson from '../../../package.json';
 
 const googleErrorMessages = {
   access_denied: 'El acceso con Google fue cancelado.',
@@ -24,6 +25,8 @@ export default function Login() {
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [googleError, setGoogleError] = useState('');
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
 
   const mutation = useMutation({
     mutationFn: login,
@@ -40,6 +43,26 @@ export default function Login() {
       navigate(routeForRole(data.user.role));
     },
   });
+
+  const forgotMutation = useMutation({
+    mutationFn: forgotPassword,
+  });
+
+  const openForgotModal = () => {
+    setForgotEmail(form.email);
+    forgotMutation.reset();
+    setShowForgotModal(true);
+  };
+
+  const closeForgotModal = () => {
+    setShowForgotModal(false);
+    forgotMutation.reset();
+  };
+
+  const handleForgotSubmit = (e) => {
+    e.preventDefault();
+    forgotMutation.mutate(forgotEmail);
+  };
 
   useEffect(() => {
     if (googleExchangeStarted.current) return;
@@ -88,17 +111,8 @@ export default function Login() {
           
           {/* Branding Area */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center p-3 bg-white border border-slate-200 rounded-2xl mb-4 shadow-sm">
-              <img 
-                alt="Cuaderno Digital Logo" 
-                className="h-12 w-auto object-contain" 
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBTCgtRnFaKBuS8iptnFKSZXuZKbxpc9nE8TsF7NpFjDxHLHwe-lnYY4jHy2jKuk0FuCwApZvUdAkiXB2DHkwbatQGMKNFCbYabEvNtElK23qgT-EpAjMuZt2IBgsYMKC6xOFRhSg6AAMhlTTBjyyI9HNygkI5Zax_knEOkYC8X7mKfgRe7uZM5dSMBk4zMub7ipx3-dnX2yNeO_63oao9n7L0Wjp9sikW8NfQ21PvpCUvL4BRtkAe9NrXoBK8nfnAMhyhGAI5eTxdy"
-                onError={(e) => {
-                  // Fallback if image fails to load
-                  e.target.style.display = 'none';
-                  e.target.outerHTML = '<span class="material-symbols-outlined text-indigo-600 text-3xl">school</span>';
-                }}
-              />
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl mb-4 shadow-sm">
+              <span className="material-symbols-outlined text-white text-4xl fill-1">school</span>
             </div>
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Cuaderno Digital</h1>
             <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider font-semibold">Gestión Académica Institucional</p>
@@ -172,9 +186,13 @@ export default function Login() {
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block" htmlFor="password">
                     Contraseña
                   </label>
-                  <a className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors uppercase tracking-wider" href="#">
+                  <button
+                    type="button"
+                    onClick={openForgotModal}
+                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors uppercase tracking-wider"
+                  >
                     ¿Olvidó su contraseña?
-                  </a>
+                  </button>
                 </div>
                 <div className="relative group">
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px] transition-colors group-focus-within:text-slate-800">
@@ -239,12 +257,12 @@ export default function Login() {
       <footer className="w-full px-8 py-6 border-t border-slate-200 bg-white">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">© 2026 EDUCORE SYSTEMS</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">© {new Date().getFullYear()} Happy Learning School</span>
             <span className="h-1.5 w-1.5 rounded-full bg-slate-200 hidden md:block"></span>
-            <span className="text-xs text-slate-400">V 4.2.0-STABLE</span>
+            <span className="text-xs text-slate-400">V {packageJson.version}</span>
           </div>
           <div className="flex items-center gap-6">
-            <a className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-800 transition-colors" href="#">
+            <a className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-800 transition-colors" href="mailto:it@happylearningschool.net">
               <span className="material-symbols-outlined text-[16px]">contact_support</span>
               Soporte Técnico
             </a>
@@ -255,6 +273,85 @@ export default function Login() {
           </div>
         </div>
       </footer>
+
+      {/* Forgot Password Modal */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={closeForgotModal}
+          />
+          <div className="relative z-10 w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-slate-900">Recuperar contraseña</h2>
+              <button
+                type="button"
+                onClick={closeForgotModal}
+                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                aria-label="Cerrar"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            {forgotMutation.isSuccess ? (
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-xs text-emerald-700 flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-[18px] shrink-0">check_circle</span>
+                <span>{forgotMutation.data?.message || 'Si el correo existe, recibirás un enlace para restablecer tu contraseña.'}</span>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotSubmit} className="space-y-4">
+                <p className="text-xs text-slate-500">
+                  Ingresa tu correo institucional y te enviaremos instrucciones para restablecer tu contraseña.
+                </p>
+
+                {forgotMutation.isError && (
+                  <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-700 flex items-start gap-2.5">
+                    <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
+                    <span>{forgotMutation.error?.response?.data?.message || 'No fue posible procesar la solicitud.'}</span>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block" htmlFor="forgot-email">
+                    Correo Institucional
+                  </label>
+                  <div className="relative group">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px] transition-colors group-focus-within:text-slate-800">
+                      mail
+                    </span>
+                    <input
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-1 focus:ring-slate-950 focus:border-slate-950 transition-all outline-none text-sm placeholder:text-slate-400"
+                      id="forgot-email"
+                      type="email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="usuario@happylearningschool.net"
+                      required
+                      disabled={forgotMutation.isPending}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  className="w-full bg-slate-950 text-white font-semibold text-sm py-3 rounded-xl hover:bg-slate-900 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:bg-slate-400 disabled:cursor-not-allowed"
+                  type="submit"
+                  disabled={forgotMutation.isPending}
+                >
+                  {forgotMutation.isPending ? (
+                    <>
+                      <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
+                      Enviando...
+                    </>
+                  ) : (
+                    'Enviar instrucciones'
+                  )}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );
