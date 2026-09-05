@@ -41,10 +41,19 @@ test('combina grado y sección sin mezclar secciones de otros grados', () => {
   assert.deepEqual(result, [courses[0]]);
 });
 
+test('permite aislar una materia cuando el docente imparte varias', () => {
+  const result = filterTeacherCourses(courses, {
+    subject: 'Lengua Española',
+  });
+
+  assert.deepEqual(result, [courses[1]]);
+});
+
 test('limita las opciones de sección al grado seleccionado', () => {
   assert.deepEqual(getCourseFilterOptions(courses, '1RO SECUNDARIA'), {
     grades: ['1RO SECUNDARIA', '2DO SECUNDARIA'],
     sections: ['A', 'B'],
+    subjects: ['Ciencias Sociales', 'Lengua Española', 'Matemática'],
   });
   assert.deepEqual(getCourseFilterOptions(courses, '2DO SECUNDARIA').sections, ['A']);
 });
