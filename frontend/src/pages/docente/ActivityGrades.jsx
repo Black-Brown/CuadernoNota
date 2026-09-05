@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCourses } from '../../api/courses.api';
@@ -15,6 +15,17 @@ export default function ActivityGrades() {
   const [localScores, setLocalScores]   = useState([]);
   const [syncStatus, setSyncStatus]     = useState({});
   const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType]       = useState('success');
+  const [isSavingAll, setIsSavingAll]   = useState(false);
+  const pendingSaveTimersRef = useRef(new Map());
+  const cellSaveChainsRef = useRef(new Map());
+  const failedCellValuesRef = useRef(new Map());
+
+  const showToast = useCallback((msg, type = 'success') => {
+    setToastType(type);
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 4000);
+  }, []);
 
   // Resolve breadcrumb info from cached courses query
   const { data: coursesData } = useQuery({
@@ -37,6 +48,7 @@ export default function ActivityGrades() {
   });
   const period = selectedPeriod || periodData?.period;
   const isPeriodOpen = period?.status === 'open';
+  const saveScope = `${activityId}:${period?.id ?? 'none'}`;
 
   const { data: periodLockData } = useQuery({
     queryKey: ['periodGradesLock', subjectId, period?.id, sectionId],
@@ -80,15 +92,77 @@ export default function ActivityGrades() {
     }
   }, [activityGradesData]);
 
-  // Mutations
-  const saveScoreMutation = useMutation({
-    mutationFn: saveActivityScore,
-    onSuccess: () => {
-      // Invalidate the period-grades cache so Workspace reflects new data immediately
-      queryClient.invalidateQueries({ queryKey: ['periodGrades', subjectId, period?.id, sectionId] });
-      queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, period?.id] });
-    },
-  });
+  const refreshGradeData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['periodGrades', subjectId, period?.id, sectionId] });
+    queryClient.invalidateQueries({ queryKey: ['periodGradesLock', subjectId, period?.id, sectionId] });
+    queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, period?.id] });
+  }, [queryClient, subjectId, period?.id, sectionId]);
+
+  // Serializa las escrituras de una misma celda para que una respuesta antigua
+  // nunca pueda sobrescribir el valor más reciente.
+  const persistCellScore = useCallback((studentId, key, value, refreshAfter = true) => {
+    const cellKey = `${saveScope}:${studentId}:${key}`;
+    const previousSave = cellSaveChainsRef.current.get(cellKey) ?? Promise.resolve();
+    const payload = {
+      activity_id: Number(activityId),
+      student_id: studentId,
+      competency_id: key === 'c1' ? 1 : key === 'c2' ? 2 : 3,
+      period_id: period?.id,
+      subject_id: Number(subjectId),
+      score: value === '' || value === null || value === undefined ? null : Number(value),
+    };
+
+    setSyncStatus(prev => ({ ...prev, [cellKey]: 'sync' }));
+
+    let trackedSave;
+    trackedSave = previousSave
+      .catch(() => undefined)
+      .then(() => saveActivityScore(payload))
+      .then((response) => {
+        failedCellValuesRef.current.delete(cellKey);
+        if (refreshAfter) refreshGradeData();
+        if (cellSaveChainsRef.current.get(cellKey) === trackedSave) {
+          setSyncStatus(prev => ({ ...prev, [cellKey]: 'cloud_done' }));
+        }
+        return response;
+      })
+      .catch((error) => {
+        failedCellValuesRef.current.set(cellKey, { studentId, key, value, scope: saveScope });
+        if (cellSaveChainsRef.current.get(cellKey) === trackedSave) {
+          setSyncStatus(prev => ({ ...prev, [cellKey]: 'error' }));
+        }
+        throw error;
+      })
+      .finally(() => {
+        if (cellSaveChainsRef.current.get(cellKey) === trackedSave) {
+          cellSaveChainsRef.current.delete(cellKey);
+        }
+      });
+
+    cellSaveChainsRef.current.set(cellKey, trackedSave);
+    return trackedSave;
+  }, [activityId, period?.id, subjectId, refreshGradeData, saveScope]);
+
+  const reportSaveError = useCallback((error) => {
+    showToast(
+      error?.response?.data?.message ?? 'No fue posible guardar la calificación. Inténtalo nuevamente.',
+      'error'
+    );
+  }, [showToast]);
+
+  const flushPendingCellSave = useCallback((studentId, key) => {
+    const cellKey = `${saveScope}:${studentId}:${key}`;
+    const pending = pendingSaveTimersRef.current.get(cellKey);
+    if (!pending) return Promise.resolve();
+
+    clearTimeout(pending.timer);
+    pendingSaveTimersRef.current.delete(cellKey);
+
+    return persistCellScore(studentId, key, pending.value).catch((error) => {
+      reportSaveError(error);
+      throw error;
+    });
+  }, [persistCellScore, reportSaveError, saveScope]);
 
   const submitGradesMutation = useMutation({
     mutationFn: submitGrades,
@@ -97,9 +171,16 @@ export default function ActivityGrades() {
       queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, period?.id] });
       showToast('Calificaciones enviadas y finalizadas correctamente.');
     },
+    onError: (error) => {
+      showToast(
+        error?.response?.data?.message ?? 'No fue posible finalizar las calificaciones.',
+        'error'
+      );
+    },
   });
 
-  // Per-cell change: update UI immediately, persist in background
+  // Update immediately and persist after a short pause so typing "100" produces
+  // one ordered request instead of three competing writes (1, 10 and 100).
   const handleScoreChange = (studentId, key, val) => {
     if (!canEditGrades) {
       showToast(
@@ -115,49 +196,91 @@ export default function ActivityGrades() {
     setLocalScores(prev =>
       prev.map(s => s.student_id === studentId ? { ...s, [key]: numVal } : s)
     );
-    setSyncStatus(prev => ({ ...prev, [studentId]: 'sync' }));
+    const cellKey = `${saveScope}:${studentId}:${key}`;
+    const previousPending = pendingSaveTimersRef.current.get(cellKey);
+    if (previousPending) clearTimeout(previousPending.timer);
 
-    saveScoreMutation.mutate(
-      {
-        activity_id:   Number(activityId),
-        student_id:    studentId,
-        competency_id: key === 'c1' ? 1 : key === 'c2' ? 2 : 3,
-        period_id:     period?.id ?? 1,
-        subject_id:    Number(subjectId),
-        score:         numVal === '' ? null : numVal,
-      },
-      {
-        onSuccess: () => setSyncStatus(prev => ({ ...prev, [studentId]: 'cloud_done' })),
-        onError:   () => setSyncStatus(prev => ({ ...prev, [studentId]: 'error' })),
-      }
-    );
+    setSyncStatus(prev => ({ ...prev, [cellKey]: 'sync' }));
+
+    const timer = setTimeout(() => {
+      pendingSaveTimersRef.current.delete(cellKey);
+      persistCellScore(studentId, key, numVal).catch(reportSaveError);
+    }, 600);
+
+    pendingSaveTimersRef.current.set(cellKey, {
+      timer,
+      value: numVal,
+      studentId,
+      key,
+      scope: saveScope,
+    });
   };
 
-  // "Guardar Progreso" button and Ctrl+Enter: persist every filled cell
-  const saveAll = useCallback(() => {
-    if (!period || !canEditGrades) return;
-    localScores.forEach(student => {
-      ['c1', 'c2', 'c3'].forEach((key, i) => {
-        const val = student[key];
-        if (val !== null && val !== '' && val !== undefined) {
-          setSyncStatus(prev => ({ ...prev, [student.student_id]: 'sync' }));
-          saveScoreMutation.mutate(
-            {
-              activity_id:   Number(activityId),
-              student_id:    student.student_id,
-              competency_id: i + 1,
-              period_id:     period.id,
-              subject_id:    Number(subjectId),
-              score:         Number(val),
-            },
-            { onSuccess: () => setSyncStatus(prev => ({ ...prev, [student.student_id]: 'cloud_done' })) }
-          );
-        }
-      });
+  // "Guardar Progreso" and Ctrl+Enter flush pending changes and wait for the API.
+  const saveAll = useCallback(async (announceSuccess = true) => {
+    if (!period || !canEditGrades) return false;
+
+    const cellsToSave = new Map();
+
+    failedCellValuesRef.current.forEach((failed, cellKey) => {
+      if (failed.scope === saveScope) cellsToSave.set(cellKey, failed);
     });
-    queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, period.id] });
-    showToast('Progreso guardado correctamente.');
-  }, [localScores, period, canEditGrades, activityId, subjectId, sectionId, queryClient]);
+
+    pendingSaveTimersRef.current.forEach((pending, cellKey) => {
+      if (pending.scope !== saveScope) return;
+      clearTimeout(pending.timer);
+      cellsToSave.set(cellKey, {
+        studentId: pending.studentId,
+        key: pending.key,
+        value: pending.value,
+      });
+      pendingSaveTimersRef.current.delete(cellKey);
+    });
+
+    setIsSavingAll(true);
+    cellsToSave.forEach(({ studentId, key, value }) => {
+      persistCellScore(studentId, key, value, false).catch(() => undefined);
+    });
+
+    const pendingRequests = Array.from(cellSaveChainsRef.current.entries())
+      .filter(([cellKey]) => cellKey.startsWith(`${saveScope}:`))
+      .map(([, request]) => request);
+    const uniquePendingRequests = Array.from(new Set(pendingRequests));
+    if (uniquePendingRequests.length === 0) {
+      setIsSavingAll(false);
+      if (announceSuccess) showToast('Todo el progreso ya está guardado.');
+      return true;
+    }
+
+    const results = await Promise.allSettled(uniquePendingRequests);
+    setIsSavingAll(false);
+    refreshGradeData();
+
+    const failedCount = results.filter(result => result.status === 'rejected').length;
+    if (failedCount > 0) {
+      showToast(
+        `No se pudieron guardar ${failedCount} ${failedCount === 1 ? 'calificación' : 'calificaciones'}. Revisa los campos marcados.`,
+        'error'
+      );
+      return false;
+    }
+
+    if (announceSuccess) showToast('Progreso guardado correctamente.');
+    return true;
+  }, [period, canEditGrades, persistCellScore, refreshGradeData, saveScope, showToast]);
+
+  const handleSubmitGrades = useCallback(async () => {
+    if (!period || !canEditGrades) return;
+
+    const saved = await saveAll(false);
+    if (!saved) return;
+
+    submitGradesMutation.mutate({
+      subject_id: Number(subjectId),
+      period_id: period.id,
+      section_id: Number(sectionId),
+    });
+  }, [period, canEditGrades, saveAll, submitGradesMutation, subjectId, sectionId]);
 
   // Ctrl+Enter shortcut
   useEffect(() => {
@@ -197,18 +320,17 @@ export default function ActivityGrades() {
   ];
   const distMax = Math.max(...distBuckets.map(b => b.count), 1);
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 4000);
-  };
-
   return (
     <DashboardLayout>
 
       {/* Toast */}
       {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-lg border border-slate-700 flex items-center gap-2">
-          <span className="material-symbols-outlined text-emerald-400 text-base">check_circle</span>
+        <div className={`fixed top-20 right-6 z-50 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-lg border flex items-center gap-2 ${
+          toastType === 'error' ? 'bg-red-700 border-red-600' : 'bg-slate-900 border-slate-700'
+        }`}>
+          <span className={`material-symbols-outlined text-base ${toastType === 'error' ? 'text-white' : 'text-emerald-400'}`}>
+            {toastType === 'error' ? 'error' : 'check_circle'}
+          </span>
           <span>{toastMessage}</span>
         </div>
       )}
@@ -234,15 +356,16 @@ export default function ActivityGrades() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={saveAll}
-            disabled={!canEditGrades}
-            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs rounded-xl shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => saveAll()}
+            disabled={!canEditGrades || isSavingAll}
+            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs rounded-xl shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-1.5"
           >
-            Guardar Progreso
+            {isSavingAll && <span className="material-symbols-outlined animate-spin text-[16px]">sync</span>}
+            {isSavingAll ? 'Guardando...' : 'Guardar Progreso'}
           </button>
           <button
-            onClick={() => period && submitGradesMutation.mutate({ subject_id: Number(subjectId), period_id: period.id, section_id: Number(sectionId) })}
-            disabled={!period || submitGradesMutation.isPending || !canEditGrades}
+            onClick={handleSubmitGrades}
+            disabled={!period || submitGradesMutation.isPending || isSavingAll || !canEditGrades}
             className="px-4 py-2 bg-slate-950 text-white hover:bg-slate-900 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined text-[18px]">check_circle</span>
@@ -356,7 +479,16 @@ export default function ActivityGrades() {
                 const rawTotal  = calcTotal(student.c1, student.c2, student.c3);
                 const totalDisp = rawTotal !== null ? rawTotal.toFixed(1) : '--';
                 const isRisk    = rawTotal !== null && rawTotal < 70;
-                const status    = syncStatus[student.student_id];
+                const cellStatuses = ['c1', 'c2', 'c3'].map(
+                  key => syncStatus[`${saveScope}:${student.student_id}:${key}`]
+                );
+                const status = cellStatuses.includes('sync')
+                  ? 'sync'
+                  : cellStatuses.includes('error')
+                    ? 'error'
+                    : cellStatuses.includes('cloud_done')
+                      ? 'cloud_done'
+                      : undefined;
 
                 return (
                   <tr key={student.student_id} className="hover:bg-slate-50/50 transition-colors">
@@ -381,6 +513,7 @@ export default function ActivityGrades() {
                           max="100"
                           value={student[key] ?? ''}
                           onChange={(e) => handleScoreChange(student.student_id, key, e.target.value)}
+                          onBlur={() => flushPendingCellSave(student.student_id, key).catch(() => undefined)}
                           disabled={!canEditGrades}
                           className={`w-full text-center font-mono py-1.5 border rounded-lg focus:ring-1 focus:outline-none text-sm transition-colors ${
                             student[key] !== null && student[key] !== '' && Number(student[key]) < 70
