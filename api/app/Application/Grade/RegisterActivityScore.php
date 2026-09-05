@@ -24,8 +24,8 @@ use App\Domain\Grade\Services\GradeCalculator;
  *  5. Actualiza (upsert) el PeriodGrade correspondiente.
  *
  * Si alguna de las tres competencias no tiene actividades con nota,
- * el Paso 2 no se puede ejecutar y el método devuelve NULL.
- * El PeriodGrade anterior (si existe) permanece sin cambios en ese caso.
+ * el Paso 2 no se puede ejecutar. En ese caso se elimina cualquier
+ * PeriodGrade anterior para no conservar cálculos desactualizados.
  */
 class RegisterActivityScore
 {
@@ -74,8 +74,14 @@ class RegisterActivityScore
         $c2 = $this->competencyCalc->calculate($allScores, 2);
         $c3 = $this->competencyCalc->calculate($allScores, 3);
 
-        // Si alguna competencia no tiene notas todavía, no se puede calcular el período
+        // Si alguna competencia queda sin notas, el cálculo anterior deja de ser válido.
         if ($c1 === null || $c2 === null || $c3 === null) {
+            $this->periodGradeRepo->deleteByStudentSubjectPeriod(
+                $scoreData['student_id'],
+                $scoreData['subject_id'],
+                $scoreData['period_id'],
+            );
+
             return null;
         }
 

@@ -301,11 +301,13 @@ class GradeController extends Controller
             ], 423);
         }
 
-        $periodGrade = $this->registerActivityScore->execute($validated);
+        $periodGrade = DB::transaction(
+            fn () => $this->registerActivityScore->execute($validated)
+        );
 
         if ($periodGrade === null) {
             return response()->json([
-                'message' => 'Nota guardada. El período aún no puede calcularse porque falta nota en alguna competencia.',
+                'message' => 'Nota guardada. El resumen del período está pendiente porque falta nota en alguna competencia.',
                 'period_grade' => null,
             ], 201);
         }

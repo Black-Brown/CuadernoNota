@@ -50,6 +50,17 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
         return $model ? $this->toEntity($model) : null;
     }
 
+    public function deleteByStudentSubjectPeriod(
+        int $studentId,
+        int $subjectId,
+        int $periodId
+    ): void {
+        PeriodGradeModel::where('student_id', $studentId)
+            ->where('subject_id', $subjectId)
+            ->where('period_id', $periodId)
+            ->delete();
+    }
+
     /**
      * Devuelve los PeriodGrade de los 4 períodos de un año,
      * ordenados por número de período ascendente.

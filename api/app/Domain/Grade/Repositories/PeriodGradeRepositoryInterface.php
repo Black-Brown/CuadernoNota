@@ -44,6 +44,16 @@ interface PeriodGradeRepositoryInterface
     ): ?PeriodGrade;
 
     /**
+     * Elimina el resumen calculado de un estudiante cuando sus notas de
+     * actividades ya no permiten calcular las tres competencias del período.
+     */
+    public function deleteByStudentSubjectPeriod(
+        int $studentId,
+        int $subjectId,
+        int $periodId
+    ): void;
+
+    /**
      * Obtiene las notas de período de un estudiante para una
      * asignatura, en los 4 períodos del año escolar.
      *
