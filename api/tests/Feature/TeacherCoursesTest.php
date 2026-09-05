@@ -68,6 +68,76 @@ class TeacherCoursesTest extends TestCase
         $this->assertFalse($courses->has('C'));
     }
 
+    public function test_courses_are_ordered_academically_regardless_of_assignment_creation_order(): void
+    {
+        $teacher = User::factory()->create(['role' => 'teacher', 'active' => true]);
+        $yearId = DB::table('academic_years')->insertGetId([
+            'name' => '2026-2027',
+            'start_date' => '2026-08-01',
+            'end_date' => '2027-06-30',
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $secondGradeId = DB::table('grades')->insertGetId([
+            'name' => '2DO SECUNDARIA',
+            'level' => 'Secundaria',
+            'sort_order' => 2,
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $firstGradeId = DB::table('grades')->insertGetId([
+            'name' => '1RO SECUNDARIA',
+            'level' => 'Secundaria',
+            'sort_order' => 1,
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $languageId = DB::table('subjects')->insertGetId([
+            'name' => 'Lengua Española',
+            'code' => 'LEN',
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $socialStudiesId = DB::table('subjects')->insertGetId([
+            'name' => 'Ciencias Sociales',
+            'code' => 'SOC',
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $secondA = $this->section($secondGradeId, $yearId, 'A');
+        $firstB = $this->section($firstGradeId, $yearId, 'B');
+        $firstA = $this->section($firstGradeId, $yearId, 'A');
+
+        // Deliberately assign in the opposite order to the expected academic display.
+        $this->assignment($teacher->id, $this->offering($secondA, $socialStudiesId), true);
+        $this->assignment($teacher->id, $this->offering($firstB, $languageId), true);
+        $this->assignment($teacher->id, $this->offering($firstA, $languageId), true);
+        $this->assignment($teacher->id, $this->offering($firstA, $socialStudiesId), true);
+
+        Sanctum::actingAs($teacher);
+
+        $courses = $this->getJson('/api/docente/courses')
+            ->assertOk()
+            ->json('courses');
+
+        $this->assertSame([
+            '1RO SECUNDARIA|A|Ciencias Sociales',
+            '1RO SECUNDARIA|A|Lengua Española',
+            '1RO SECUNDARIA|B|Lengua Española',
+            '2DO SECUNDARIA|A|Ciencias Sociales',
+        ], collect($courses)->map(fn (array $course) => implode('|', [
+            $course['grade_name'],
+            $course['section_name'],
+            $course['subject_name'],
+        ]))->all());
+    }
+
     private function section(int $gradeId, int $yearId, string $name): int
     {
         return DB::table('sections')->insertGetId([

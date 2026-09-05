@@ -18,7 +18,61 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
     {
         $courses = TeacherSectionModel::where('user_id', $teacherId)
             ->with(['section.grade', 'subject', 'academicYear'])
-            ->get();
+            ->get()
+            ->sort(function (TeacherSectionModel $left, TeacherSectionModel $right): int {
+                $activeYearComparison = (int) ($right->academicYear?->active ?? false)
+                    <=> (int) ($left->academicYear?->active ?? false);
+
+                if ($activeYearComparison !== 0) {
+                    return $activeYearComparison;
+                }
+
+                $leftYearStart = $left->academicYear?->start_date?->getTimestamp() ?? 0;
+                $rightYearStart = $right->academicYear?->start_date?->getTimestamp() ?? 0;
+                $yearComparison = $rightYearStart <=> $leftYearStart;
+
+                if ($yearComparison !== 0) {
+                    return $yearComparison;
+                }
+
+                $gradeComparison = ($left->section?->grade?->sort_order ?? PHP_INT_MAX)
+                    <=> ($right->section?->grade?->sort_order ?? PHP_INT_MAX);
+
+                if ($gradeComparison !== 0) {
+                    return $gradeComparison;
+                }
+
+                $gradeNameComparison = strnatcasecmp(
+                    $left->section?->grade?->name ?? '',
+                    $right->section?->grade?->name ?? '',
+                );
+
+                if ($gradeNameComparison !== 0) {
+                    return $gradeNameComparison;
+                }
+
+                $sectionComparison = strnatcasecmp(
+                    $left->section?->name ?? '',
+                    $right->section?->name ?? '',
+                );
+
+                if ($sectionComparison !== 0) {
+                    return $sectionComparison;
+                }
+
+                $subjectComparison = strnatcasecmp(
+                    $left->subject?->name ?? '',
+                    $right->subject?->name ?? '',
+                );
+
+                if ($subjectComparison !== 0) {
+                    return $subjectComparison;
+                }
+
+                return [$left->section_id, $left->subject_id]
+                    <=> [$right->section_id, $right->subject_id];
+            })
+            ->values();
 
         $studentCounts = StudentModel::query()
             ->whereIn('section_id', $courses->pluck('section_id')->unique())
@@ -28,18 +82,18 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
             ->pluck('students_count', 'section_id');
 
         return $courses
-            ->map(fn($ts) => [
-                'section_id'       => $ts->section_id,
-                'subject_id'       => $ts->subject_id,
+            ->map(fn ($ts) => [
+                'section_id' => $ts->section_id,
+                'subject_id' => $ts->subject_id,
                 'academic_year_id' => $ts->academic_year_id,
-                'grade_name'       => $ts->section?->grade?->name ?? '',
-                'section_name'     => $ts->section?->name ?? '',
-                'subject_name'     => $ts->subject?->name ?? '',
-                'year_label'       => $ts->academicYear?->name ?? '',
+                'grade_name' => $ts->section?->grade?->name ?? '',
+                'section_name' => $ts->section?->name ?? '',
+                'subject_name' => $ts->subject?->name ?? '',
+                'year_label' => $ts->academicYear?->name ?? '',
                 // teacher_sections is a compatibility view that only exposes
                 // active teacher assignments backed by active course offerings.
-                'status'           => 'active',
-                'students_count'   => (int) ($studentCounts[$ts->section_id] ?? 0),
+                'status' => 'active',
+                'students_count' => (int) ($studentCounts[$ts->section_id] ?? 0),
             ])
             ->all();
     }
@@ -74,7 +128,7 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
             ->avg(DB::raw('COALESCE(period_grades.rp_score, period_grades.period_score)'));
 
         $attendancePct = null;
-        if (!empty($sectionIds)) {
+        if (! empty($sectionIds)) {
             $attendance = AttendanceModel::whereIn('section_id', $sectionIds)
                 ->when($period, fn ($query) => $query
                     ->whereDate('date', '>=', $period->start_date)
@@ -87,10 +141,10 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
         }
 
         return [
-            'active_courses'  => $activeCourses,
-            'total_students'  => $totalStudents,
-            'avg_grade'       => $avgGrade !== null ? round((float) $avgGrade, 1) : null,
-            'attendance_avg'  => $attendancePct,
+            'active_courses' => $activeCourses,
+            'total_students' => $totalStudents,
+            'avg_grade' => $avgGrade !== null ? round((float) $avgGrade, 1) : null,
+            'attendance_avg' => $attendancePct,
         ];
     }
 
@@ -120,8 +174,8 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
 
         $scores = $grades->pluck('period_score')->filter()->all();
 
-        $groupAvg    = count($scores) > 0 ? round(array_sum($scores) / count($scores), 1) : null;
-        $atRiskCount = $grades->filter(fn($g) => ($g->period_score ?? 0) < 70)->count();
+        $groupAvg = count($scores) > 0 ? round(array_sum($scores) / count($scores), 1) : null;
+        $atRiskCount = $grades->filter(fn ($g) => ($g->period_score ?? 0) < 70)->count();
 
         $attendance = AttendanceModel::where('section_id', $sectionId)
             ->when($period, fn ($query) => $query
@@ -132,25 +186,31 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
         $attendancePct = $total > 0 ? round($present / $total * 100, 1) : null;
 
         $distribution = [
-            'below_70'  => 0,
-            '70_to_80'  => 0,
-            '80_to_90'  => 0,
-            '90_to_95'  => 0,
+            'below_70' => 0,
+            '70_to_80' => 0,
+            '80_to_90' => 0,
+            '90_to_95' => 0,
             '95_to_100' => 0,
         ];
         foreach ($scores as $s) {
-            if ($s < 70)       $distribution['below_70']++;
-            elseif ($s < 80)   $distribution['70_to_80']++;
-            elseif ($s < 90)   $distribution['80_to_90']++;
-            elseif ($s < 95)   $distribution['90_to_95']++;
-            else               $distribution['95_to_100']++;
+            if ($s < 70) {
+                $distribution['below_70']++;
+            } elseif ($s < 80) {
+                $distribution['70_to_80']++;
+            } elseif ($s < 90) {
+                $distribution['80_to_90']++;
+            } elseif ($s < 95) {
+                $distribution['90_to_95']++;
+            } else {
+                $distribution['95_to_100']++;
+            }
         }
 
         return [
-            'group_avg'       => $groupAvg,
-            'at_risk_count'   => $atRiskCount,
-            'attendance_pct'  => $attendancePct,
-            'distribution'    => $distribution,
+            'group_avg' => $groupAvg,
+            'at_risk_count' => $atRiskCount,
+            'attendance_pct' => $attendancePct,
+            'distribution' => $distribution,
         ];
     }
 }

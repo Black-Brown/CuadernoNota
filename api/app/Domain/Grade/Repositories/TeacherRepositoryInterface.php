@@ -7,7 +7,8 @@ namespace App\Domain\Grade\Repositories;
 interface TeacherRepositoryInterface
 {
     /**
-     * Devuelve los cursos (sección + asignatura) asignados al docente.
+     * Devuelve los cursos (sección + asignatura) asignados al docente, ordenados
+     * por año vigente/reciente, orden académico del grado, sección y asignatura.
      *
      * @return array [['section_id', 'subject_id', 'academic_year_id', 'grade_name', 'section_name', 'subject_name', 'status', 'students_count'], ...]
      */
