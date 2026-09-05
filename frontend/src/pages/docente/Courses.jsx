@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getCourses } from '../../api/courses.api';
 import { getDashboardSummary } from '../../api/dashboard.api';
 import DashboardLayout from '../../components/DashboardLayout';
+import SearchInput from '../../components/ui/SearchInput';
 import usePeriodStore from '../../store/periodStore';
+import {
+  filterTeacherCourses,
+  getCourseFilterOptions,
+  normalizeCourseText,
+} from '../../utils/teacherCourseFilters';
 
 const SUBJECT_META = [
   {
@@ -51,13 +57,9 @@ const SUBJECT_META = [
   },
 ];
 
-function normalize(value = '') {
-  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-
 function subjectMeta(subjectName = '') {
-  const normalized = normalize(subjectName);
-  return SUBJECT_META.find((item) => item.match.some((term) => normalized.includes(normalize(term)))) || {
+  const normalized = normalizeCourseText(subjectName);
+  return SUBJECT_META.find((item) => item.match.some((term) => normalized.includes(normalizeCourseText(term)))) || {
     icon: 'school',
     label: subjectName || 'Asignatura',
     tone: 'bg-slate-50 text-slate-700 border-slate-100',
@@ -79,6 +81,9 @@ function uniqueStudentTotal(courses) {
 }
 
 export default function Courses() {
+  const [search, setSearch] = useState('');
+  const [gradeFilter, setGradeFilter] = useState('');
+  const [sectionFilter, setSectionFilter] = useState('');
   const selectedPeriod = usePeriodStore((state) => state.selectedPeriod);
   const { data, isLoading } = useQuery({
     queryKey: ['courses'],
@@ -95,6 +100,25 @@ export default function Courses() {
   const totalStudents = summaryData?.total_students ?? uniqueStudentTotal(rawCourses);
   const avgGrade = summaryData?.avg_grade ?? null;
   const attendanceAvg = summaryData?.attendance_avg ?? null;
+  const { grades: gradeOptions, sections: sectionOptions } = useMemo(
+    () => getCourseFilterOptions(rawCourses, gradeFilter),
+    [rawCourses, gradeFilter],
+  );
+  const visibleCourses = useMemo(
+    () => filterTeacherCourses(rawCourses, {
+      search,
+      grade: gradeFilter,
+      section: sectionFilter,
+    }),
+    [rawCourses, search, gradeFilter, sectionFilter],
+  );
+  const hasFilters = Boolean(search.trim() || gradeFilter || sectionFilter);
+
+  function clearFilters() {
+    setSearch('');
+    setGradeFilter('');
+    setSectionFilter('');
+  }
 
   return (
     <DashboardLayout>
@@ -129,6 +153,73 @@ export default function Courses() {
         </div>
       </div>
 
+      {!isLoading && rawCourses.length > 0 && (
+        <section className="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Filtros de cursos">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(280px,2fr)_minmax(180px,1fr)_minmax(180px,1fr)]">
+            <div>
+              <label className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                Buscar curso
+              </label>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por materia, grado, sección o año..."
+              />
+            </div>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                Grado
+              </span>
+              <select
+                value={gradeFilter}
+                onChange={(event) => {
+                  setGradeFilter(event.target.value);
+                  setSectionFilter('');
+                }}
+                className="h-[38px] w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="">Todos los grados</option>
+                {gradeOptions.map((grade) => (
+                  <option key={grade} value={grade}>{grade}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                Sección
+              </span>
+              <select
+                value={sectionFilter}
+                onChange={(event) => setSectionFilter(event.target.value)}
+                className="h-[38px] w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="">Todas las secciones</option>
+                {sectionOptions.map((section) => (
+                  <option key={section} value={section}>Sección {section}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs font-semibold text-slate-500" aria-live="polite">
+              {visibleCourses.length} de {rawCourses.length} {rawCourses.length === 1 ? 'curso' : 'cursos'}
+            </p>
+            <button
+              type="button"
+              onClick={clearFilters}
+              disabled={!hasFilters}
+              className="inline-flex items-center gap-1 self-start text-xs font-bold text-indigo-600 transition-colors hover:text-indigo-800 disabled:cursor-not-allowed disabled:text-slate-300 sm:self-auto"
+            >
+              <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+              Limpiar filtros
+            </button>
+          </div>
+        </section>
+      )}
+
       {isLoading ? (
         <div className="rounded-xl border border-slate-200 bg-white p-12 text-center shadow-sm">
           <span className="material-symbols-outlined text-[42px] text-indigo-500 animate-spin">progress_activity</span>
@@ -139,15 +230,28 @@ export default function Courses() {
           <span className="material-symbols-outlined text-[42px] text-slate-300">school_off</span>
           <p className="mt-3 text-sm font-semibold text-slate-600">No tienes cursos asignados.</p>
         </div>
+      ) : visibleCourses.length === 0 ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+          <span className="material-symbols-outlined text-[42px] text-slate-300">search_off</span>
+          <p className="mt-3 text-sm font-semibold text-slate-700">No encontramos cursos con esos filtros.</p>
+          <p className="mt-1 text-xs text-slate-500">Prueba otra búsqueda o limpia la selección actual.</p>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="mt-4 rounded-lg bg-slate-950 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-800"
+          >
+            Limpiar filtros
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {rawCourses.map((course) => {
+          {visibleCourses.map((course) => {
             const meta = subjectMeta(course.subject_name);
             const status = statusMeta(course.status);
 
             return (
               <Link
-                key={`${course.section_id}-${course.subject_id}`}
+                key={`${course.academic_year_id}-${course.section_id}-${course.subject_id}`}
                 to={`/docente/courses/${course.section_id}/${course.subject_id}`}
                 className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
               >
