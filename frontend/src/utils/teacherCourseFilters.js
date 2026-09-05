@@ -10,6 +10,7 @@ export function filterTeacherCourses(courses = [], filters = {}) {
   const search = normalizeCourseText(filters.search);
   const grade = filters.grade || '';
   const section = filters.section || '';
+  const subject = filters.subject || '';
 
   return courses.filter((course) => {
     if (grade && course.grade_name !== grade) {
@@ -17,6 +18,10 @@ export function filterTeacherCourses(courses = [], filters = {}) {
     }
 
     if (section && course.section_name !== section) {
+      return false;
+    }
+
+    if (subject && course.subject_name !== subject) {
       return false;
     }
 
@@ -36,6 +41,7 @@ export function filterTeacherCourses(courses = [], filters = {}) {
 export function getCourseFilterOptions(courses = [], selectedGrade = '') {
   const grades = [];
   const sections = [];
+  const subjects = [];
 
   courses.forEach((course) => {
     if (course.grade_name && !grades.includes(course.grade_name)) {
@@ -49,7 +55,11 @@ export function getCourseFilterOptions(courses = [], selectedGrade = '') {
     ) {
       sections.push(course.section_name);
     }
+
+    if (course.subject_name && !subjects.includes(course.subject_name)) {
+      subjects.push(course.subject_name);
+    }
   });
 
-  return { grades, sections };
+  return { grades, sections, subjects };
 }

@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { getCourses } from '../../api/courses.api';
 import { getDashboardSummary } from '../../api/dashboard.api';
 import DashboardLayout from '../../components/DashboardLayout';
-import SearchInput from '../../components/ui/SearchInput';
 import usePeriodStore from '../../store/periodStore';
 import {
   filterTeacherCourses,
@@ -80,10 +79,55 @@ function uniqueStudentTotal(courses) {
   ])).values()].reduce((total, count) => total + count, 0);
 }
 
+function CourseFilterSelect({ label, value, onChange, options, allLabel }) {
+  return (
+    <label className={`relative inline-flex max-w-full items-center gap-1.5 rounded-xl border px-3 py-2 transition-colors ${
+      value
+        ? 'border-indigo-200 bg-indigo-50/80 text-indigo-700'
+        : 'border-slate-200 bg-slate-50/80 text-slate-700 hover:bg-slate-100'
+    }`}>
+      <span className={`shrink-0 text-xs font-normal ${value ? 'text-indigo-500' : 'text-slate-400'}`}>
+        {label}:
+      </span>
+      <select
+        aria-label={`Filtrar por ${label.toLowerCase()}`}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-w-0 max-w-[190px] appearance-none bg-transparent py-0 pl-0 pr-5 text-xs font-semibold text-current outline-none"
+      >
+        <option value="">{allLabel}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+      <span className="material-symbols-outlined pointer-events-none absolute right-2 text-[16px] text-slate-400">
+        expand_more
+      </span>
+    </label>
+  );
+}
+
+function ActiveFilterChip({ label, value, onRemove }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+      <span>{label}: <strong className="font-semibold text-slate-800">{value}</strong></span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="inline-flex rounded-full text-slate-400 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+        aria-label={`Quitar filtro ${label.toLowerCase()}`}
+      >
+        <span className="material-symbols-outlined text-[14px]">close</span>
+      </button>
+    </span>
+  );
+}
+
 export default function Courses() {
   const [search, setSearch] = useState('');
   const [gradeFilter, setGradeFilter] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
+  const [subjectFilter, setSubjectFilter] = useState('');
   const selectedPeriod = usePeriodStore((state) => state.selectedPeriod);
   const { data, isLoading } = useQuery({
     queryKey: ['courses'],
@@ -100,7 +144,11 @@ export default function Courses() {
   const totalStudents = summaryData?.total_students ?? uniqueStudentTotal(rawCourses);
   const avgGrade = summaryData?.avg_grade ?? null;
   const attendanceAvg = summaryData?.attendance_avg ?? null;
-  const { grades: gradeOptions, sections: sectionOptions } = useMemo(
+  const {
+    grades: gradeOptions,
+    sections: sectionOptions,
+    subjects: subjectOptions,
+  } = useMemo(
     () => getCourseFilterOptions(rawCourses, gradeFilter),
     [rawCourses, gradeFilter],
   );
@@ -109,15 +157,17 @@ export default function Courses() {
       search,
       grade: gradeFilter,
       section: sectionFilter,
+      subject: subjectFilter,
     }),
-    [rawCourses, search, gradeFilter, sectionFilter],
+    [rawCourses, search, gradeFilter, sectionFilter, subjectFilter],
   );
-  const hasFilters = Boolean(search.trim() || gradeFilter || sectionFilter);
+  const hasFilters = Boolean(search.trim() || gradeFilter || sectionFilter || subjectFilter);
 
   function clearFilters() {
     setSearch('');
     setGradeFilter('');
     setSectionFilter('');
+    setSubjectFilter('');
   }
 
   return (
@@ -154,68 +204,91 @@ export default function Courses() {
       </div>
 
       {!isLoading && rawCourses.length > 0 && (
-        <section className="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Filtros de cursos">
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(280px,2fr)_minmax(180px,1fr)_minmax(180px,1fr)]">
-            <div>
-              <label className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                Buscar curso
-              </label>
-              <SearchInput
+        <section className="mb-5 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm" aria-label="Filtros de cursos">
+          <div className="flex flex-col justify-between gap-3.5 p-4 sm:p-5 xl:flex-row xl:items-center">
+            <div className="relative min-w-0 flex-1 xl:max-w-xl">
+              <span className="material-symbols-outlined pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-[19px] text-slate-400">
+                search
+              </span>
+              <input
+                type="search"
+                aria-label="Buscar cursos"
                 value={search}
-                onChange={setSearch}
+                onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar por materia, grado, sección o año..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-2 pl-10 pr-10 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute inset-y-0 right-3 flex items-center text-slate-400 transition-colors hover:text-slate-700"
+                  aria-label="Limpiar búsqueda"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              )}
             </div>
 
-            <label className="block">
-              <span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                Grado
-              </span>
-              <select
+            <div className="flex flex-wrap items-center gap-2">
+              <CourseFilterSelect
+                label="Grado"
                 value={gradeFilter}
-                onChange={(event) => {
-                  setGradeFilter(event.target.value);
+                onChange={(value) => {
+                  setGradeFilter(value);
                   setSectionFilter('');
                 }}
-                className="h-[38px] w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value="">Todos los grados</option>
-                {gradeOptions.map((grade) => (
-                  <option key={grade} value={grade}>{grade}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-                Sección
-              </span>
-              <select
+                options={gradeOptions}
+                allLabel="Todos los grados"
+              />
+              <CourseFilterSelect
+                label="Sección"
                 value={sectionFilter}
-                onChange={(event) => setSectionFilter(event.target.value)}
-                className="h-[38px] w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value="">Todas las secciones</option>
-                {sectionOptions.map((section) => (
-                  <option key={section} value={section}>Sección {section}</option>
-                ))}
-              </select>
-            </label>
+                onChange={setSectionFilter}
+                options={sectionOptions}
+                allLabel="Todas las secciones"
+              />
+              <CourseFilterSelect
+                label="Materia"
+                value={subjectFilter}
+                onChange={setSubjectFilter}
+                options={subjectOptions}
+                allLabel="Todas las materias"
+              />
+            </div>
           </div>
 
-          <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs font-semibold text-slate-500" aria-live="polite">
-              {visibleCourses.length} de {rawCourses.length} {rawCourses.length === 1 ? 'curso' : 'cursos'}
-            </p>
-            <button
-              type="button"
-              onClick={clearFilters}
-              disabled={!hasFilters}
-              className="inline-flex items-center gap-1 self-start text-xs font-bold text-indigo-600 transition-colors hover:text-indigo-800 disabled:cursor-not-allowed disabled:text-slate-300 sm:self-auto"
-            >
-              <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
-              Limpiar filtros
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-5 py-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="font-semibold text-slate-700" aria-live="polite">
+                {visibleCourses.length} de {rawCourses.length} {rawCourses.length === 1 ? 'curso' : 'cursos'}
+              </span>
+              {(gradeFilter || sectionFilter || subjectFilter) && <span className="text-slate-300">|</span>}
+              {gradeFilter && (
+                <ActiveFilterChip label="Grado" value={gradeFilter} onRemove={() => setGradeFilter('')} />
+              )}
+              {sectionFilter && (
+                <ActiveFilterChip label="Sección" value={sectionFilter} onRemove={() => setSectionFilter('')} />
+              )}
+              {subjectFilter && (
+                <ActiveFilterChip label="Materia" value={subjectFilter} onRemove={() => setSubjectFilter('')} />
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="hidden text-slate-500 sm:inline">
+                Orden: <strong className="font-semibold text-slate-700">Grado y sección</strong>
+              </span>
+              <button
+                type="button"
+                onClick={clearFilters}
+                disabled={!hasFilters}
+                className="inline-flex items-center gap-1.5 font-medium text-slate-500 transition-colors hover:text-slate-800 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                Limpiar filtros
+              </button>
+            </div>
           </div>
         </section>
       )}
