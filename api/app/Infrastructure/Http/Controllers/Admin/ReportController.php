@@ -42,12 +42,15 @@ class ReportController extends Controller
     public function attendance(Request $request): JsonResponse
     {
         $yearId = $request->integer('academic_year_id') ?: DB::table('academic_years')->where('active', true)->value('id');
+
         return response()->json(DB::table('attendances')->join('sections', 'attendances.section_id', '=', 'sections.id')->join('grades', 'sections.grade_id', '=', 'grades.id')
+            ->leftJoin('subjects', 'attendances.subject_id', '=', 'subjects.id')
             ->where('sections.academic_year_id', $yearId)->select('grades.name as grade', 'sections.name as section',
-                DB::raw('COUNT(*) as records'), DB::raw("SUM(CASE WHEN code IN ('P', 'T') THEN 1 ELSE 0 END) as present"),
-                DB::raw("SUM(CASE WHEN code = 'A' THEN 1 ELSE 0 END) as absent"), DB::raw("SUM(CASE WHEN code = 'T' THEN 1 ELSE 0 END) as late"),
-                DB::raw("SUM(CASE WHEN code = 'E' THEN 1 ELSE 0 END) as excused"))
-            ->groupBy('grades.name', 'sections.name')->orderBy('grades.name')->get());
+                DB::raw("COALESCE(subjects.name, 'Sin materia (histórico)') as subject"),
+                DB::raw('COUNT(*) as records'), DB::raw("SUM(CASE WHEN attendances.code IN ('P', 'T') THEN 1 ELSE 0 END) as present"),
+                DB::raw("SUM(CASE WHEN attendances.code = 'A' THEN 1 ELSE 0 END) as absent"), DB::raw("SUM(CASE WHEN attendances.code = 'T' THEN 1 ELSE 0 END) as late"),
+                DB::raw("SUM(CASE WHEN attendances.code = 'E' THEN 1 ELSE 0 END) as excused"))
+            ->groupBy('grades.name', 'sections.name', 'subjects.name')->orderBy('grades.name')->orderBy('sections.name')->orderBy('subjects.name')->get());
     }
 
     public function audits(Request $request): JsonResponse
@@ -62,10 +65,13 @@ class ReportController extends Controller
             'course_offerings', 'teacher_assignments', 'activity_templates', 'course_activities', 'competencies', 'activity_scores', 'period_grades',
             'final_grades', 'attendances', 'observations', 'alerts', 'promotion_decisions', 'grade_review_actions', 'audit_logs'];
         AuditLog::create(['user_id' => $request->user()->id, 'action' => 'backup', 'affected_table' => 'database', 'record_id' => 0, 'detail' => ['tables' => $tables], 'ip' => $request->ip()]);
+
         return response()->streamDownload(function () use ($tables) {
             echo "{\n\"generated_at\":".json_encode(now()->toIso8601String()).",\n\"tables\":{";
             foreach ($tables as $index => $table) {
-                if ($index) echo ',';
+                if ($index) {
+                    echo ',';
+                }
                 $query = DB::table($table);
 
                 if ($table === 'users') {

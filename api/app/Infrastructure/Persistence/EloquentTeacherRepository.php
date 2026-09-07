@@ -128,11 +128,17 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
             ->avg(DB::raw('COALESCE(period_grades.rp_score, period_grades.period_score)'));
 
         $attendancePct = null;
-        if (! empty($sectionIds)) {
-            $attendance = AttendanceModel::whereIn('section_id', $sectionIds)
+        if ($teacherSections->isNotEmpty()) {
+            $attendance = AttendanceModel::query()
+                ->join('teacher_sections', function ($join) use ($teacherId) {
+                    $join->on('teacher_sections.section_id', '=', 'attendances.section_id')
+                        ->on('teacher_sections.subject_id', '=', 'attendances.subject_id')
+                        ->where('teacher_sections.user_id', '=', $teacherId);
+                })
+                ->when($academicYearId, fn ($query) => $query->where('teacher_sections.academic_year_id', $academicYearId))
                 ->when($period, fn ($query) => $query
-                    ->whereDate('date', '>=', $period->start_date)
-                    ->whereDate('date', '<=', $period->end_date));
+                    ->whereDate('attendances.date', '>=', $period->start_date)
+                    ->whereDate('attendances.date', '<=', $period->end_date));
             $total = (clone $attendance)->count();
             $present = (clone $attendance)
                 ->whereIn('code', ['P', 'T'])
@@ -178,6 +184,7 @@ class EloquentTeacherRepository implements TeacherRepositoryInterface
         $atRiskCount = $grades->filter(fn ($g) => ($g->period_score ?? 0) < 70)->count();
 
         $attendance = AttendanceModel::where('section_id', $sectionId)
+            ->where('subject_id', $subjectId)
             ->when($period, fn ($query) => $query
                 ->whereDate('date', '>=', $period->start_date)
                 ->whereDate('date', '<=', $period->end_date));

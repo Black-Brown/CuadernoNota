@@ -107,7 +107,7 @@ export default function RiskStudent() {
         `Período: ${selectedPeriod?.name || 'No especificado'}`,
         `Nivel de riesgo: ${levelLabel[student.risk_level] || student.risk_level}`,
         `Promedio actual: ${student.average_grade ?? 'Sin registro'}`,
-        `Asistencia: ${student.attendance_pct}%`,
+        `Asistencia: ${student.attendance_pct == null ? 'Sin registros' : `${student.attendance_pct}%`}`,
         `Competencia crítica: ${student.critical_competency?.toUpperCase() || 'Sin registro'}`,
         '',
         'Favor revisar este caso para seguimiento de coordinación.',
@@ -146,7 +146,7 @@ export default function RiskStudent() {
       ['Periodo', selectedPeriod?.name || ''],
       ['Nivel de riesgo', levelLabel[student.risk_level] || student.risk_level],
       ['Promedio actual', student.average_grade ?? 'Sin registro'],
-      ['Asistencia', `${student.attendance_pct}%`],
+      ['Asistencia', student.attendance_pct == null ? 'Sin registros' : `${student.attendance_pct}%`],
       ['Competencia critica', student.critical_competency?.toUpperCase() || 'Sin registro'],
       ['Alertas activas', student.active_alerts],
       [],
@@ -248,7 +248,7 @@ export default function RiskStudent() {
           <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
             {[
               ['Promedio actual', student.average_grade ?? '--', '/100', scoreClass(student.average_grade)],
-              ['Asistencia', `${student.attendance_pct}%`, '', scoreClass(student.attendance_pct < 80 ? 60 : 80)],
+              ['Asistencia', student.attendance_pct == null ? '—' : `${student.attendance_pct}%`, '', scoreClass(student.attendance_pct == null ? null : student.attendance_pct < 80 ? 60 : 80)],
               ['Competencia crítica', student.critical_competency?.toUpperCase() || '--', '', 'text-slate-900'],
               ['Alertas activas', student.active_alerts, '', 'text-slate-900'],
             ].map(([label, value, suffix, color]) => (
@@ -368,7 +368,7 @@ export default function RiskStudent() {
                         <span className={`h-2 w-2 rounded-full ${dot}`} />
                         {label}
                       </span>
-                      <span className="font-mono font-bold text-slate-900">{value ?? '--'}%</span>
+                      <span className="font-mono font-bold text-slate-900">{value == null ? '—' : `${value}%`}</span>
                     </div>
                   ))}
                 </div>

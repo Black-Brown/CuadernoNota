@@ -15,7 +15,7 @@ use App\Domain\Attendance\Services\AttendanceAlertService;
  * evalúa las dos condiciones de alerta:
  *
  *  - consecutive: TRUE si el estudiante acumula 3 o más ausencias
- *                 no justificadas consecutivas en el mes actual.
+ *                 no justificadas consecutivas en la materia.
  *  - lowAnnual:   TRUE si la asistencia anual cae por debajo del 80 %.
  *
  * El resultado se devuelve al controlador para que este decida cómo
@@ -24,43 +24,38 @@ use App\Domain\Attendance\Services\AttendanceAlertService;
 class RegisterAttendance
 {
     /**
-     * @param AttendanceRepositoryInterface $attendanceRepo Repositorio de registros de asistencia
-     * @param AttendanceAlertService        $alertService   Servicio de evaluación de alertas
+     * @param  AttendanceRepositoryInterface  $attendanceRepo  Repositorio de registros de asistencia
+     * @param  AttendanceAlertService  $alertService  Servicio de evaluación de alertas
      */
     public function __construct(
         private readonly AttendanceRepositoryInterface $attendanceRepo,
-        private readonly AttendanceAlertService        $alertService,
+        private readonly AttendanceAlertService $alertService,
     ) {}
 
     /**
      * Guarda el registro de asistencia y evalúa las alertas.
      *
-     * @param AttendanceRecord $record Registro de asistencia a persistir
-     *
+     * @param  AttendanceRecord  $record  Registro de asistencia a persistir
      * @return array{consecutive: bool, lowAnnual: bool}
-     *         Flags indicando qué alertas (si alguna) se activaron.
+     *                                                   Flags indicando qué alertas (si alguna) se activaron.
      */
     public function execute(AttendanceRecord $record): array
     {
+        if ($record->sectionId === null || $record->subjectId === null) {
+            throw new \InvalidArgumentException('La sección y la materia son obligatorias para evaluar la asistencia.');
+        }
+
         $this->attendanceRepo->save($record);
 
-        $year  = (int) $record->date->format('Y');
-        $month = (int) $record->date->format('n');
-
-        $monthRecords = $this->attendanceRepo->findByStudentAndMonth(
+        $yearRecords = $this->attendanceRepo->findByStudentAndCourseAcademicYear(
             $record->studentId,
-            $year,
-            $month,
-        );
-
-        $yearRecords = $this->attendanceRepo->findByStudentAndYear(
-            $record->studentId,
-            $year,
+            $record->sectionId,
+            $record->subjectId,
         );
 
         return [
-            'consecutive' => $this->alertService->hasConsecutiveAbsenceAlert($monthRecords),
-            'lowAnnual'   => $this->alertService->hasBelowMinimumAnnualAttendance($yearRecords),
+            'consecutive' => $this->alertService->hasConsecutiveAbsenceAlert($yearRecords),
+            'lowAnnual' => $this->alertService->hasBelowMinimumAnnualAttendance($yearRecords),
         ];
     }
 }

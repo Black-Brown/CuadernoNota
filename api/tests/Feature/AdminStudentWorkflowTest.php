@@ -61,12 +61,12 @@ class AdminStudentWorkflowTest extends TestCase
             'cf' => 85, 'created_at' => now(), 'updated_at' => now(),
         ]);
         DB::table('attendances')->insert([
-            ['student_id' => $studentId, 'section_id' => $sectionId, 'user_id' => $admin->id,
-             'date' => '2026-08-10', 'code' => 'P', 'created_at' => now(), 'updated_at' => now()],
-            ['student_id' => $studentId, 'section_id' => $sectionId, 'user_id' => $admin->id,
-             'date' => '2026-08-11', 'code' => 'T', 'created_at' => now(), 'updated_at' => now()],
-            ['student_id' => $studentId, 'section_id' => $sectionId, 'user_id' => $admin->id,
-             'date' => '2026-08-12', 'code' => 'A', 'created_at' => now(), 'updated_at' => now()],
+            ['student_id' => $studentId, 'section_id' => $sectionId, 'subject_id' => $subjectId, 'user_id' => $admin->id,
+                'date' => '2026-08-10', 'code' => 'P', 'created_at' => now(), 'updated_at' => now()],
+            ['student_id' => $studentId, 'section_id' => $sectionId, 'subject_id' => $subjectId, 'user_id' => $admin->id,
+                'date' => '2026-08-11', 'code' => 'T', 'created_at' => now(), 'updated_at' => now()],
+            ['student_id' => $studentId, 'section_id' => $sectionId, 'subject_id' => $subjectId, 'user_id' => $admin->id,
+                'date' => '2026-08-12', 'code' => 'A', 'created_at' => now(), 'updated_at' => now()],
         ]);
         DB::table('observations')->insert([
             'student_id' => $studentId, 'user_id' => $admin->id, 'section_id' => $sectionId,
@@ -86,6 +86,7 @@ class AdminStudentWorkflowTest extends TestCase
             ->assertJsonFragment(['code' => 'P']);
         $this->getJson("/api/admin/reports/attendance?academic_year_id={$yearId}")
             ->assertOk()
+            ->assertJsonPath('0.subject', 'Robótica')
             ->assertJsonPath('0.records', 3)
             ->assertJsonPath('0.present', 2)
             ->assertJsonPath('0.late', 1);

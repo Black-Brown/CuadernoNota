@@ -26,7 +26,7 @@ use RuntimeException;
 class UpdateToExcuse
 {
     /**
-     * @param AttendanceRepositoryInterface $attendanceRepo Repositorio de registros de asistencia
+     * @param  AttendanceRepositoryInterface  $attendanceRepo  Repositorio de registros de asistencia
      */
     public function __construct(
         private readonly AttendanceRepositoryInterface $attendanceRepo,
@@ -35,10 +35,10 @@ class UpdateToExcuse
     /**
      * Marca un registro de asistencia como justificado.
      *
-     * @param int $attendanceId ID del registro de asistencia a actualizar
+     * @param  int  $attendanceId  ID del registro de asistencia a actualizar
      *
      * @throws RuntimeException Si el registro no existe o si intenta
-     *                           justificar un registro de presencia.
+     *                          justificar un registro de presencia.
      */
     public function execute(int $attendanceId): void
     {
@@ -52,7 +52,7 @@ class UpdateToExcuse
 
         if ($record->countsAsAttendance()) {
             throw new RuntimeException(
-                "No se puede justificar un registro marcado como presente o tardanza."
+                'No se puede justificar un registro marcado como presente o tardanza.'
             );
         }
 
@@ -62,10 +62,10 @@ class UpdateToExcuse
         }
 
         $excused = new AttendanceRecord(
-            id:        $record->id,
+            id: $record->id,
             studentId: $record->studentId,
-            date:      $record->date,
-            status:    AttendanceRecord::STATUS_EXCUSED,
+            date: $record->date,
+            status: AttendanceRecord::STATUS_EXCUSED,
         );
 
         $this->attendanceRepo->update($excused);

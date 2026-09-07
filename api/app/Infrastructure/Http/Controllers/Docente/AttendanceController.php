@@ -2,7 +2,7 @@
 
 namespace App\Infrastructure\Http\Controllers\Docente;
 
-use App\Application\Attendance\GetAttendanceBySection;
+use App\Application\Attendance\GetAttendanceByCourse;
 use App\Application\Attendance\RegisterAttendance;
 use App\Application\Attendance\UpdateToExcuse;
 use App\Domain\Attendance\Entities\AttendanceRecord;
@@ -16,32 +16,38 @@ use Illuminate\Support\Facades\DB;
 class AttendanceController extends Controller
 {
     public function __construct(
-        private readonly GetAttendanceBySection $getAttendanceBySection,
-        private readonly RegisterAttendance     $registerAttendance,
-        private readonly UpdateToExcuse         $updateToExcuse,
+        private readonly GetAttendanceByCourse $getAttendanceByCourse,
+        private readonly RegisterAttendance $registerAttendance,
+        private readonly UpdateToExcuse $updateToExcuse,
     ) {}
 
-    public function index(int $sectionId, string $date): JsonResponse
+    public function index(int $sectionId, int $subjectId, string $date): JsonResponse
     {
-        if (! $this->teacherCanManageSection($sectionId)) {
-            return response()->json(['message' => 'No tienes permiso para consultar la asistencia de esta sección.'], 403);
+        if (! $this->teacherCanManageCourse($sectionId, $subjectId)) {
+            return response()->json(['message' => 'No tienes permiso para consultar la asistencia de este curso.'], 403);
         }
 
         if (! $this->dateBelongsToActivePeriod($sectionId, $date)) {
             return response()->json(['message' => 'La fecha no pertenece a un período actualmente activo.'], 422);
         }
 
-        $records = $this->getAttendanceBySection->execute($sectionId, $date);
+        $records = $this->getAttendanceByCourse->execute($sectionId, $subjectId, $date);
 
-        return response()->json(['date' => $date, 'records' => $records]);
+        return response()->json([
+            'date' => $date,
+            'section_id' => $sectionId,
+            'subject_id' => $subjectId,
+            'records' => $records,
+        ]);
     }
 
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'student_id' => 'required|integer|exists:students,id',
-            'date'       => 'required|date_format:Y-m-d',
-            'status'     => 'required|in:present,late,absent,excused',
+            'subject_id' => 'required|integer|exists:subjects,id',
+            'date' => 'required|date_format:Y-m-d',
+            'status' => 'required|in:present,late,absent,excused',
         ]);
 
         $sectionId = DB::table('students')
@@ -53,8 +59,8 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'El estudiante no tiene una sección activa asignada.'], 422);
         }
 
-        if (! $this->teacherCanManageSection((int) $sectionId)) {
-            return response()->json(['message' => 'No tienes permiso para registrar asistencia en esta sección.'], 403);
+        if (! $this->teacherCanManageCourse((int) $sectionId, (int) $validated['subject_id'])) {
+            return response()->json(['message' => 'No tienes permiso para registrar asistencia en este curso.'], 403);
         }
 
         if (! $this->dateBelongsToActivePeriod((int) $sectionId, $validated['date'])) {
@@ -63,6 +69,7 @@ class AttendanceController extends Controller
 
         $existingOwner = DB::table('attendances')
             ->where('student_id', $validated['student_id'])
+            ->where('subject_id', $validated['subject_id'])
             ->whereDate('date', $validated['date'])
             ->value('user_id');
 
@@ -71,30 +78,33 @@ class AttendanceController extends Controller
         }
 
         $record = new AttendanceRecord(
-            id:        0,
+            id: 0,
             studentId: $validated['student_id'],
-            date:      new DateTimeImmutable($validated['date']),
-            status:    $validated['status'],
+            date: new DateTimeImmutable($validated['date']),
+            status: $validated['status'],
+            sectionId: (int) $sectionId,
+            subjectId: (int) $validated['subject_id'],
+            teacherId: (int) Auth::id(),
         );
 
         $alerts = $this->registerAttendance->execute($record);
 
         return response()->json([
             'message' => 'Asistencia registrada.',
-            'alerts'  => $alerts,
+            'alerts' => $alerts,
         ], 201);
     }
 
     public function updateExcuse(int $id): JsonResponse
     {
-        $attendance = DB::table('attendances')->where('id', $id)->first(['section_id', 'user_id', 'date']);
+        $attendance = DB::table('attendances')->where('id', $id)->first(['section_id', 'subject_id', 'user_id', 'date']);
 
         if (! $attendance) {
             return response()->json(['message' => 'Registro de asistencia no encontrado.'], 404);
         }
 
-        if (! $this->teacherCanManageSection((int) $attendance->section_id)) {
-            return response()->json(['message' => 'No tienes permiso para justificar asistencia en esta sección.'], 403);
+        if ($attendance->subject_id === null || ! $this->teacherCanManageCourse((int) $attendance->section_id, (int) $attendance->subject_id)) {
+            return response()->json(['message' => 'No tienes permiso para justificar asistencia en este curso.'], 403);
         }
 
         if ((int) $attendance->user_id !== (int) Auth::id()) {
@@ -110,11 +120,12 @@ class AttendanceController extends Controller
         return response()->json(['message' => 'Falta justificada correctamente.']);
     }
 
-    private function teacherCanManageSection(int $sectionId): bool
+    private function teacherCanManageCourse(int $sectionId, int $subjectId): bool
     {
         return DB::table('teacher_sections')
             ->where('user_id', Auth::id())
             ->where('section_id', $sectionId)
+            ->where('subject_id', $subjectId)
             ->exists();
     }
 

@@ -188,7 +188,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
             // Asistencia
             Route::get(
-                '/attendance/{sectionId}/{date}',
+                '/attendance/{sectionId}/{subjectId}/{date}',
                 [AttendanceController::class, 'index']
             )->name('attendance.index');
 

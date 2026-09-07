@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import DashboardLayout from '../../components/DashboardLayout';
 import { getCourses } from '../../api/courses.api';
-import { getSectionAttendance, saveAttendance } from '../../api/attendance.api';
+import { getCourseAttendance, saveAttendance } from '../../api/attendance.api';
 import usePeriodStore from '../../store/periodStore';
 
 const STATUS_META = {
@@ -13,49 +13,41 @@ const STATUS_META = {
   excused: { label: 'Justificada', icon: 'fact_check', active: 'border-amber-500 bg-amber-50 text-amber-700' },
 };
 
-function groupSections(courses = [], yearId = null) {
-  const grouped = new Map();
-  courses.filter((course) => !yearId || Number(course.academic_year_id) === Number(yearId)).forEach((course) => {
-    const key = String(course.section_id);
-    const current = grouped.get(key) || { ...course, subjects: [] };
-    if (!current.subjects.some((item) => Number(item.id) === Number(course.subject_id))) {
-      current.subjects.push({ id: course.subject_id, name: course.subject_name });
-    }
-    grouped.set(key, current);
-  });
-  return [...grouped.values()];
+function filterCourses(courses = [], yearId = null) {
+  return courses.filter((course) => !yearId || Number(course.academic_year_id) === Number(yearId));
 }
 
 export default function Attendance() {
-  const { sectionId } = useParams();
-  return sectionId ? <AttendanceWorkspace sectionId={sectionId} /> : <AttendanceCourses />;
+  const { sectionId, subjectId } = useParams();
+  return sectionId && subjectId ? <AttendanceWorkspace sectionId={sectionId} subjectId={subjectId} /> : <AttendanceCourses />;
 }
 
 function AttendanceCourses() {
   const selectedPeriod = usePeriodStore((state) => state.selectedPeriod);
   const { data, isLoading } = useQuery({ queryKey: ['courses'], queryFn: getCourses, staleTime: 5 * 60_000 });
-  const sections = useMemo(() => groupSections(data?.courses, selectedPeriod?.academic_year_id), [data, selectedPeriod?.academic_year_id]);
+  const courses = useMemo(() => filterCourses(data?.courses, selectedPeriod?.academic_year_id), [data, selectedPeriod?.academic_year_id]);
   const periodOpen = selectedPeriod?.status === 'open';
 
   return (
     <DashboardLayout>
-      <PageHeading description="Selecciona una sección para abrir su workspace de asistencia del período." />
+      <PageHeading description="Selecciona un curso para registrar la asistencia de esa materia sin mezclarla con las demás." />
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
         <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Período seleccionado</p><p className="mt-1 text-sm font-extrabold text-slate-900">{selectedPeriod?.name || 'Selecciona un período'}</p></div>
-        <span className="rounded-md bg-indigo-50 px-3 py-1.5 text-xs font-extrabold text-indigo-700">{sections.length} {sections.length === 1 ? 'sección' : 'secciones'}</span>
+        <span className="rounded-md bg-indigo-50 px-3 py-1.5 text-xs font-extrabold text-indigo-700">{courses.length} {courses.length === 1 ? 'curso' : 'cursos'}</span>
       </div>
-      {isLoading ? <EmptyPanel text="Cargando secciones asignadas..." icon="progress_activity" spinning /> : sections.length === 0 ? <EmptyPanel text="No tienes secciones asignadas en este período." icon="event_busy" /> : (
+      {isLoading ? <EmptyPanel text="Cargando cursos asignados..." icon="progress_activity" spinning /> : courses.length === 0 ? <EmptyPanel text="No tienes cursos asignados en este período." icon="event_busy" /> : (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {sections.map((section) => (
-            <Link key={section.section_id} to={`/docente/attendance/${section.section_id}`} className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md">
+          {courses.map((course) => (
+            <Link key={`${course.section_id}-${course.subject_id}`} to={`/docente/attendance/${course.section_id}/${course.subject_id}`} className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md">
               <div className="border-b border-indigo-100 bg-indigo-50/70 px-5 py-5">
                 <div className="flex items-start justify-between gap-4"><span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm"><span className="material-symbols-outlined text-[27px]">fact_check</span></span><span className={`rounded-md border px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider ${periodOpen ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-600'}`}>{periodOpen ? 'Activa' : selectedPeriod?.status === 'upcoming' ? 'Próxima' : 'Bloqueada'}</span></div>
                 <p className="mt-5 text-[10px] font-extrabold uppercase tracking-wider text-indigo-500">Workspace de asistencia</p>
               </div>
               <div className="p-5">
-                <h2 className="text-lg font-extrabold text-slate-900">{section.grade_name} · Sección {section.section_name}</h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">{section.year_label || 'Año escolar activo'}</p>
-                <div className="mt-5 grid grid-cols-2 gap-3 border-y border-slate-100 py-4"><div><p className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400">Materias</p><p className="mt-1 text-sm font-bold text-slate-800">{section.subjects.length}</p></div><div><p className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400">Registro</p><p className="mt-1 text-sm font-bold text-slate-800">Diario</p></div></div>
+                <h2 className="text-lg font-extrabold text-slate-900">{course.grade_name} · Sección {course.section_name}</h2>
+                <p className="mt-1 text-sm font-bold text-indigo-600">{course.subject_name}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">{course.year_label || 'Año escolar activo'}</p>
+                <div className="mt-5 grid grid-cols-2 gap-3 border-y border-slate-100 py-4"><div><p className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400">Materia</p><p className="mt-1 truncate text-sm font-bold text-slate-800">{course.subject_name}</p></div><div><p className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400">Registro</p><p className="mt-1 text-sm font-bold text-slate-800">Diario</p></div></div>
                 <div className="mt-4 flex items-center justify-between"><span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Estudiantes de la sección</span><span className="flex items-center gap-1 text-xs font-extrabold text-indigo-600">Abrir <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">arrow_forward</span></span></div>
               </div>
             </Link>
@@ -66,15 +58,15 @@ function AttendanceCourses() {
   );
 }
 
-function AttendanceWorkspace({ sectionId }) {
+function AttendanceWorkspace({ sectionId, subjectId }) {
   const queryClient = useQueryClient();
   const selectedPeriod = usePeriodStore((state) => state.selectedPeriod);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [draft, setDraft] = useState({});
   const [message, setMessage] = useState(null);
   const { data: courseData, isLoading: loadingCourses } = useQuery({ queryKey: ['courses'], queryFn: getCourses, staleTime: 5 * 60_000 });
-  const sections = useMemo(() => groupSections(courseData?.courses, selectedPeriod?.academic_year_id), [courseData, selectedPeriod?.academic_year_id]);
-  const selectedSection = sections.find((section) => String(section.section_id) === String(sectionId));
+  const courses = useMemo(() => filterCourses(courseData?.courses, selectedPeriod?.academic_year_id), [courseData, selectedPeriod?.academic_year_id]);
+  const selectedCourse = courses.find((course) => String(course.section_id) === String(sectionId) && String(course.subject_id) === String(subjectId));
   const periodOpen = selectedPeriod?.status === 'open';
 
   useEffect(() => {
@@ -82,7 +74,7 @@ function AttendanceWorkspace({ sectionId }) {
     if (date < selectedPeriod.start_date || date > selectedPeriod.end_date) setDate(selectedPeriod.start_date);
   }, [selectedPeriod, date]);
 
-  const attendance = useQuery({ queryKey: ['attendance', sectionId, date], queryFn: () => getSectionAttendance(sectionId, date), enabled: !!sectionId && !!date && !loadingCourses, retry: false });
+  const attendance = useQuery({ queryKey: ['attendance', sectionId, subjectId, date], queryFn: () => getCourseAttendance(sectionId, subjectId, date), enabled: !!sectionId && !!subjectId && !!date && !loadingCourses, retry: false });
   useEffect(() => {
     const next = {};
     (attendance.data?.records || []).forEach((record) => { next[record.student_id] = record.status || 'present'; });
@@ -93,16 +85,16 @@ function AttendanceWorkspace({ sectionId }) {
   const changed = useMemo(() => records.filter((record) => (draft[record.student_id] || 'present') !== record.status), [records, draft]);
   const totals = Object.values(draft).reduce((result, status) => ({ ...result, [status]: (result[status] || 0) + 1 }), {});
   const saveMutation = useMutation({
-    mutationFn: async () => Promise.all(changed.map((record) => saveAttendance(record.student_id, date, draft[record.student_id] || 'present'))),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['attendance', sectionId, date] }); setMessage({ type: 'success', text: 'Asistencia guardada correctamente.' }); },
+    mutationFn: async () => Promise.all(changed.map((record) => saveAttendance(record.student_id, subjectId, date, draft[record.student_id] || 'present'))),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['attendance', sectionId, subjectId, date] }); setMessage({ type: 'success', text: 'Asistencia guardada correctamente.' }); },
     onError: (error) => setMessage({ type: 'error', text: error?.response?.data?.message || 'No se pudo guardar la asistencia.' }),
   });
 
   return (
     <DashboardLayout>
-      <Link to="/docente/attendance" className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-900"><span className="material-symbols-outlined text-[17px]">arrow_back</span>Volver a las secciones</Link>
-      <PageHeading description="Registra la asistencia diaria de los estudiantes de esta sección." />
-      <section className="mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Sección seleccionada</p><h2 className="mt-1 text-lg font-extrabold text-slate-900">{selectedSection ? `${selectedSection.grade_name} · Sección ${selectedSection.section_name}` : 'Cargando sección...'}</h2><p className="mt-1 text-xs font-semibold text-slate-500">{selectedPeriod?.name} · {selectedSection?.year_label}</p></div><label className="w-full text-xs font-extrabold uppercase tracking-wider text-slate-500 md:w-72">Fecha<input type="date" value={date} min={selectedPeriod?.start_date} max={selectedPeriod?.end_date} onChange={(event) => setDate(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-500" /></label></div></section>
+      <Link to="/docente/attendance" className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-900"><span className="material-symbols-outlined text-[17px]">arrow_back</span>Volver a los cursos</Link>
+      <PageHeading description="Registra la asistencia diaria para esta materia y sección." />
+      <section className="mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Curso seleccionado</p><h2 className="mt-1 text-lg font-extrabold text-slate-900">{selectedCourse ? `${selectedCourse.grade_name} · Sección ${selectedCourse.section_name}` : 'Cargando curso...'}</h2><p className="mt-1 text-sm font-bold text-indigo-600">{selectedCourse?.subject_name}</p><p className="mt-1 text-xs font-semibold text-slate-500">{selectedPeriod?.name} · {selectedCourse?.year_label}</p></div><label className="w-full text-xs font-extrabold uppercase tracking-wider text-slate-500 md:w-72">Fecha<input type="date" value={date} min={selectedPeriod?.start_date} max={selectedPeriod?.end_date} onChange={(event) => setDate(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-500" /></label></div></section>
       {!periodOpen && <div className="mb-4 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700">Este período todavía no está activo o ya finalizó. La asistencia permanece en modo consulta.</div>}
       {message && <div className={`mb-4 rounded-lg border px-4 py-3 text-sm font-bold ${message.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{message.text}</div>}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

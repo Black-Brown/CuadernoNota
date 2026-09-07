@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use App\Application\Activity\EnsureDefaultCourseActivities;
 use App\Infrastructure\Models\CourseOffering;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -44,11 +44,11 @@ class BigSeed extends Seeder
 
     // Enrollment prefix map (keeps enrollment_no globally unique)
     private array $prefixMap = [
-        '7mo Grado|A'    => '7A',
-        '7mo Grado|B'    => '7B',
-        '8vo Grado|A'    => '8A',
-        '8vo Grado|B'    => '8B',
-        '9no Grado|A'    => '9A',
+        '7mo Grado|A' => '7A',
+        '7mo Grado|B' => '7B',
+        '8vo Grado|A' => '8A',
+        '8vo Grado|B' => '8B',
+        '9no Grado|A' => '9A',
         '1ro Primaria|A' => 'P1A',
         '2do Primaria|A' => 'P2A',
         '3ro Primaria|A' => 'P3A',
@@ -64,21 +64,21 @@ class BigSeed extends Seeder
 
     public function run(): void
     {
-        $yearId     = $this->seedUsersAndYear();
-        $gradeIds   = $this->seedGrades();
+        $yearId = $this->seedUsersAndYear();
+        $gradeIds = $this->seedGrades();
         $sectionIds = $this->seedSections($gradeIds, $yearId);
         $subjectIds = $this->seedSubjects($gradeIds);
-        $periodIds  = $this->seedPeriods($yearId);
-        $tIds       = $this->getTeacherIds();
+        $periodIds = $this->seedPeriods($yearId);
+        $tIds = $this->getTeacherIds();
 
         $this->seedTeacherSections($yearId, $sectionIds, $subjectIds, $tIds);
         $studentMap = $this->seedStudents($yearId, $sectionIds);
-        $actIds     = $this->seedActivities($yearId, $subjectIds, $tIds);
+        $actIds = $this->seedActivities($yearId, $subjectIds, $tIds);
 
         $this->seedPeriodGrades($studentMap, $subjectIds, $periodIds);
         $this->seedActivityScores($studentMap, $subjectIds, $periodIds, $actIds);
         $this->seedFinalGrades($studentMap, $subjectIds, $yearId);
-        $this->seedAttendances($studentMap, $sectionIds, $tIds);
+        $this->seedAttendances($studentMap, $sectionIds, $subjectIds, $tIds);
         $this->seedObservations($studentMap, $tIds);
         $this->seedAlerts($studentMap);
         $this->seedAuditLogs($tIds);
@@ -108,7 +108,7 @@ class BigSeed extends Seeder
         DB::table('academic_years')->updateOrInsert(
             ['name' => '2025-2026'],
             ['start_date' => '2025-09-01', 'end_date' => '2026-06-30', 'active' => true,
-             'created_at' => now(), 'updated_at' => now()]
+                'created_at' => now(), 'updated_at' => now()]
         );
 
         return DB::table('academic_years')->where('name', '2025-2026')->value('id');
@@ -135,6 +135,7 @@ class BigSeed extends Seeder
             );
             $ids[$name] = DB::table('grades')->where('name', $name)->value('id');
         }
+
         return $ids;
     }
 
@@ -156,18 +157,21 @@ class BigSeed extends Seeder
 
         $ids = [];
         foreach ($sections as [$gradeName, $sName, $shift]) {
-            if (!isset($gradeIds[$gradeName])) continue;
+            if (! isset($gradeIds[$gradeName])) {
+                continue;
+            }
             DB::table('sections')->updateOrInsert(
                 ['grade_id' => $gradeIds[$gradeName], 'academic_year_id' => $yearId, 'name' => $sName],
                 ['shift' => $shift, 'created_at' => now(), 'updated_at' => now()]
             );
-            $key = $gradeName . '|' . $sName;
+            $key = $gradeName.'|'.$sName;
             $ids[$key] = DB::table('sections')
                 ->where('grade_id', $gradeIds[$gradeName])
                 ->where('academic_year_id', $yearId)
                 ->where('name', $sName)
                 ->value('id');
         }
+
         return $ids;
     }
 
@@ -208,7 +212,9 @@ class BigSeed extends Seeder
 
         $ids = [];
         foreach ($subjects as [$gradeName, $code, $name]) {
-            if (!isset($gradeIds[$gradeName])) continue;
+            if (! isset($gradeIds[$gradeName])) {
+                continue;
+            }
             DB::table('subjects')->updateOrInsert(
                 ['name' => $name],
                 ['code' => $catalogCodes[$name], 'active' => true, 'created_at' => now(), 'updated_at' => now()]
@@ -220,6 +226,7 @@ class BigSeed extends Seeder
             );
             $ids[$code] = $subjectId;
         }
+
         return $ids;
     }
 
@@ -239,11 +246,12 @@ class BigSeed extends Seeder
             DB::table('periods')->updateOrInsert(
                 ['academic_year_id' => $yearId, 'number' => $num],
                 ['name' => $name, 'months' => $months, 'start_date' => $start,
-                 'end_date' => $end, 'status' => $status, 'created_at' => now(), 'updated_at' => now()]
+                    'end_date' => $end, 'status' => $status, 'created_at' => now(), 'updated_at' => now()]
             );
             $ids[$num] = DB::table('periods')
                 ->where('academic_year_id', $yearId)->where('number', $num)->value('id');
         }
+
         return $ids;
     }
 
@@ -253,9 +261,9 @@ class BigSeed extends Seeder
     {
         return [
             'main' => DB::table('users')->where('email', 'docente@demo.com')->value('id'),
-            'p2'   => DB::table('users')->where('email', 'profe2@demo.com')->value('id'),
-            'p3'   => DB::table('users')->where('email', 'profe3@demo.com')->value('id'),
-            'p4'   => DB::table('users')->where('email', 'profe4@demo.com')->value('id'),
+            'p2' => DB::table('users')->where('email', 'profe2@demo.com')->value('id'),
+            'p3' => DB::table('users')->where('email', 'profe3@demo.com')->value('id'),
+            'p4' => DB::table('users')->where('email', 'profe4@demo.com')->value('id'),
         ];
     }
 
@@ -280,7 +288,9 @@ class BigSeed extends Seeder
         ];
 
         foreach ($assignments as [$uid, $sk, $sc]) {
-            if (!isset($sids[$sk], $subIds[$sc])) continue;
+            if (! isset($sids[$sk], $subIds[$sc])) {
+                continue;
+            }
             DB::table('course_offerings')->updateOrInsert(
                 ['section_id' => $sids[$sk], 'subject_id' => $subIds[$sc]],
                 ['active' => true, 'created_at' => now(), 'updated_at' => now()]
@@ -292,7 +302,7 @@ class BigSeed extends Seeder
             DB::table('teacher_assignments')->updateOrInsert(
                 ['teacher_id' => $uid, 'course_offering_id' => $offeringId],
                 ['assigned_by' => null, 'assigned_at' => now(), 'active' => true,
-                 'created_at' => now(), 'updated_at' => now()]
+                    'created_at' => now(), 'updated_at' => now()]
             );
             app(EnsureDefaultCourseActivities::class)->execute(
                 CourseOffering::findOrFail($offeringId),
@@ -309,25 +319,28 @@ class BigSeed extends Seeder
         $map = [];
 
         foreach ($targetSections as $sk) {
-            if (!isset($sids[$sk])) continue;
+            if (! isset($sids[$sk])) {
+                continue;
+            }
             $sectionId = $sids[$sk];
-            $prefix    = $this->prefixMap[$sk];
-            $map[$sk]  = [];
+            $prefix = $this->prefixMap[$sk];
+            $map[$sk] = [];
 
             for ($i = 1; $i <= 20; $i++) {
                 $fn = $this->firstNames[($i - 1) % count($this->firstNames)];
                 $ln = $this->lastNames[($i - 1) % count($this->lastNames)];
-                $en = '2025-' . $prefix . '-' . str_pad($i, 3, '0', STR_PAD_LEFT);
+                $en = '2025-'.$prefix.'-'.str_pad($i, 3, '0', STR_PAD_LEFT);
 
                 DB::table('students')->updateOrInsert(
                     ['enrollment_no' => $en],
                     ['name' => $fn, 'last_name' => $ln, 'section_id' => $sectionId,
-                     'academic_year_id' => $yearId, 'active' => true,
-                     'created_at' => now(), 'updated_at' => now()]
+                        'academic_year_id' => $yearId, 'active' => true,
+                        'created_at' => now(), 'updated_at' => now()]
                 );
                 $map[$sk][] = DB::table('students')->where('enrollment_no', $en)->value('id');
             }
         }
+
         return $map;
     }
 
@@ -336,11 +349,13 @@ class BigSeed extends Seeder
     private function seedActivities(int $yearId, array $subIds, array $tIds): array
     {
         $baseNames = ['Proyectos', 'Examen', 'Tareas', 'Ensayo', 'Producción en aula', 'Diagnósticas'];
-        $targets   = ['MAT-7', 'CNA-8', 'LEN-7', 'ING-7', 'MAT-8', 'LEN', 'MAT-P1', 'MAT-P2'];
+        $targets = ['MAT-7', 'CNA-8', 'LEN-7', 'ING-7', 'MAT-8', 'LEN', 'MAT-P1', 'MAT-P2'];
 
         $actIds = [];
         foreach ($targets as $code) {
-            if (!isset($subIds[$code])) continue;
+            if (! isset($subIds[$code])) {
+                continue;
+            }
             $sid = $subIds[$code];
             $actIds[$code] = [];
             foreach ($baseNames as $name) {
@@ -349,6 +364,7 @@ class BigSeed extends Seeder
                     ->where('academic_year_id', $yearId)->value('id');
             }
         }
+
         return $actIds;
     }
 
@@ -365,20 +381,22 @@ class BigSeed extends Seeder
         $p1 = $periodIds[1];
 
         foreach ($courseMap as $sk => $subCode) {
-            if (!isset($studentMap[$sk], $subIds[$subCode])) continue;
+            if (! isset($studentMap[$sk], $subIds[$subCode])) {
+                continue;
+            }
             $subId = $subIds[$subCode];
 
             foreach ($studentMap[$sk] as $idx => $studId) {
                 [$c1, $c2, $c3] = $this->scorePatterns[$idx % count($this->scorePatterns)];
-                $ps  = round(($c1 + $c2 + $c3) / 3, 2);
-                $rp  = $ps < 70 ? min(74.0, round($ps + rand(5, 14), 2)) : null;
+                $ps = round(($c1 + $c2 + $c3) / 3, 2);
+                $rp = $ps < 70 ? min(74.0, round($ps + rand(5, 14), 2)) : null;
 
                 DB::table('period_grades')->updateOrInsert(
                     ['student_id' => $studId, 'subject_id' => $subId, 'period_id' => $p1],
                     ['section_id' => DB::table('students')->where('id', $studId)->value('section_id'),
-                     'c1_score' => $c1, 'c2_score' => $c2, 'c3_score' => $c3,
-                     'period_score' => $ps, 'rp_score' => $rp, 'status' => 'official',
-                     'created_at' => now(), 'updated_at' => now()]
+                        'c1_score' => $c1, 'c2_score' => $c2, 'c3_score' => $c3,
+                        'period_score' => $ps, 'rp_score' => $rp, 'status' => 'official',
+                        'created_at' => now(), 'updated_at' => now()]
                 );
             }
         }
@@ -400,12 +418,16 @@ class BigSeed extends Seeder
         $targetActivities = ['Proyectos', 'Examen'];
 
         foreach ($courseMap as $sk => $subCode) {
-            if (!isset($studentMap[$sk], $subIds[$subCode], $actIds[$subCode])) continue;
+            if (! isset($studentMap[$sk], $subIds[$subCode], $actIds[$subCode])) {
+                continue;
+            }
             $subId = $subIds[$subCode];
 
             foreach ($targetActivities as $actName) {
                 $actId = $actIds[$subCode][$actName] ?? null;
-                if (!$actId) continue;
+                if (! $actId) {
+                    continue;
+                }
 
                 foreach ($studentMap[$sk] as $idx => $studId) {
                     [$c1, $c2, $c3] = $this->scorePatterns[$idx % count($this->scorePatterns)];
@@ -420,16 +442,16 @@ class BigSeed extends Seeder
                             ->where('subject_id', $subId)
                             ->exists();
 
-                        if (!$exists) {
+                        if (! $exists) {
                             DB::table('activity_scores')->insert([
-                                'activity_id'   => $actId,
-                                'student_id'    => $studId,
+                                'activity_id' => $actId,
+                                'student_id' => $studId,
                                 'competency_id' => $compId,
-                                'period_id'     => $p1,
-                                'subject_id'    => $subId,
-                                'score'         => $score,
-                                'created_at'    => now(),
-                                'updated_at'    => now(),
+                                'period_id' => $p1,
+                                'subject_id' => $subId,
+                                'score' => $score,
+                                'created_at' => now(),
+                                'updated_at' => now(),
                             ]);
                         }
                     }
@@ -450,15 +472,17 @@ class BigSeed extends Seeder
         $cfValues = [4, 5, 5, 4, 5, 3, 5, 4, 5, 5, 3, 4, 5, 5, 4, 5, 3, 5, 4, 5];
 
         foreach ($courseMap as $sk => $subCode) {
-            if (!isset($studentMap[$sk], $subIds[$subCode])) continue;
+            if (! isset($studentMap[$sk], $subIds[$subCode])) {
+                continue;
+            }
             $subId = $subIds[$subCode];
 
             foreach ($studentMap[$sk] as $idx => $studId) {
                 DB::table('final_grades')->updateOrInsert(
                     ['student_id' => $studId, 'subject_id' => $subId, 'academic_year_id' => $yearId],
                     ['cf' => $cfValues[$idx % count($cfValues)],
-                     'final_recovery' => null, 'special_recovery' => null,
-                     'created_at' => now(), 'updated_at' => now()]
+                        'final_recovery' => null, 'special_recovery' => null,
+                        'created_at' => now(), 'updated_at' => now()]
                 );
             }
         }
@@ -466,37 +490,48 @@ class BigSeed extends Seeder
 
     // ─── Attendances ───────────────────────────────────────────────────────
 
-    private function seedAttendances(array $studentMap, array $sids, array $tIds): void
+    private function seedAttendances(array $studentMap, array $sids, array $subIds, array $tIds): void
     {
         $days = $this->getRecentWorkingDays(20);
-        $teacherSections = ['7mo Grado|A', '7mo Grado|B', '8vo Grado|A'];
+        $teacherCourses = [
+            '7mo Grado|A' => 'MAT-7',
+            '7mo Grado|B' => 'MAT-7',
+            '8vo Grado|A' => 'CNA-8',
+        ];
 
         // Weighted pool: 85% P, 8% A, 5% T, 2% E
         $pool = array_merge(
             array_fill(0, 85, 'P'),
-            array_fill(0, 8,  'A'),
-            array_fill(0, 5,  'T'),
-            array_fill(0, 2,  'E')
+            array_fill(0, 8, 'A'),
+            array_fill(0, 5, 'T'),
+            array_fill(0, 2, 'E')
         );
 
         srand(42);
 
-        foreach ($teacherSections as $sk) {
-            if (!isset($studentMap[$sk], $sids[$sk])) continue;
+        foreach ($teacherCourses as $sk => $subjectCode) {
+            if (! isset($studentMap[$sk], $sids[$sk], $subIds[$subjectCode])) {
+                continue;
+            }
             $sectionId = $sids[$sk];
+            $subjectId = $subIds[$subjectCode];
 
             foreach ($days as $date) {
                 foreach ($studentMap[$sk] as $studId) {
                     $exists = DB::table('attendances')
-                        ->where('student_id', $studId)->where('date', $date)->exists();
+                        ->where('student_id', $studId)
+                        ->where('subject_id', $subjectId)
+                        ->where('date', $date)
+                        ->exists();
 
-                    if (!$exists) {
+                    if (! $exists) {
                         DB::table('attendances')->insert([
                             'student_id' => $studId,
                             'section_id' => $sectionId,
-                            'user_id'    => $tIds['main'],
-                            'date'       => $date,
-                            'code'       => $pool[array_rand($pool)],
+                            'subject_id' => $subjectId,
+                            'user_id' => $tIds['main'],
+                            'date' => $date,
+                            'code' => $pool[array_rand($pool)],
                             'created_at' => now(),
                             'updated_at' => now(),
                         ]);
@@ -514,22 +549,24 @@ class BigSeed extends Seeder
         $types = array_keys($this->obTexts);
 
         foreach ($teacherSections as $sk) {
-            if (!isset($studentMap[$sk])) continue;
+            if (! isset($studentMap[$sk])) {
+                continue;
+            }
             foreach (array_slice($studentMap[$sk], 0, 8) as $studId) {
                 $type = $types[array_rand($types)];
                 $texts = $this->obTexts[$type];
                 $exists = DB::table('observations')
                     ->where('student_id', $studId)->where('user_id', $tIds['main'])->exists();
 
-                if (!$exists) {
+                if (! $exists) {
                     DB::table('observations')->insert([
-                        'student_id'  => $studId,
-                        'user_id'     => $tIds['main'],
-                        'date'        => now()->subDays(rand(1, 45))->format('Y-m-d'),
-                        'type'        => $type,
+                        'student_id' => $studId,
+                        'user_id' => $tIds['main'],
+                        'date' => now()->subDays(rand(1, 45))->format('Y-m-d'),
+                        'type' => $type,
                         'description' => $texts[array_rand($texts)],
-                        'created_at'  => now(),
-                        'updated_at'  => now(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ]);
                 }
             }
@@ -543,23 +580,25 @@ class BigSeed extends Seeder
         $msgMap = [
             'consecutive_absences' => 'El estudiante ha registrado más de 3 ausencias consecutivas. Requiere atención.',
             'attendance_percentage' => 'El porcentaje de asistencia está por debajo del 85% requerido.',
-            'performance'           => 'El rendimiento académico está por debajo del mínimo de aprobación (70 puntos).',
+            'performance' => 'El rendimiento académico está por debajo del mínimo de aprobación (70 puntos).',
         ];
         $types = array_keys($msgMap);
 
         foreach (['7mo Grado|A', '7mo Grado|B', '8vo Grado|A'] as $sk) {
-            if (!isset($studentMap[$sk])) continue;
+            if (! isset($studentMap[$sk])) {
+                continue;
+            }
             // Indices 4 & 5 have low scores (68/65/70 and 55/60/58)
             foreach (array_slice($studentMap[$sk], 4, 3) as $studId) {
                 $type = $types[array_rand($types)];
                 $exists = DB::table('alerts')
                     ->where('student_id', $studId)->where('type', $type)->exists();
-                if (!$exists) {
+                if (! $exists) {
                     DB::table('alerts')->insert([
                         'student_id' => $studId,
-                        'type'       => $type,
-                        'message'    => $msgMap[$type],
-                        'resolved'   => false,
+                        'type' => $type,
+                        'message' => $msgMap[$type],
+                        'resolved' => false,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
@@ -572,7 +611,9 @@ class BigSeed extends Seeder
 
     private function seedAuditLogs(array $tIds): void
     {
-        if (DB::table('audit_logs')->count() > 0) return;
+        if (DB::table('audit_logs')->count() > 0) {
+            return;
+        }
 
         $entries = [
             [$tIds['main'], 'login',               'users',         1],
@@ -591,13 +632,13 @@ class BigSeed extends Seeder
 
         foreach ($entries as $i => [$uid, $action, $table, $recId]) {
             DB::table('audit_logs')->insert([
-                'user_id'        => $uid,
-                'action'         => $action,
+                'user_id' => $uid,
+                'action' => $action,
                 'affected_table' => $table,
-                'record_id'      => $recId,
-                'detail'         => json_encode(['seed' => true, 'entry' => $i + 1]),
-                'ip'             => '192.168.1.' . (100 + $i),
-                'created_at'     => now()->subMinutes(($i + 1) * 25),
+                'record_id' => $recId,
+                'detail' => json_encode(['seed' => true, 'entry' => $i + 1]),
+                'ip' => '192.168.1.'.(100 + $i),
+                'created_at' => now()->subMinutes(($i + 1) * 25),
             ]);
         }
     }
@@ -622,11 +663,12 @@ class BigSeed extends Seeder
         $days = [];
         $date = now()->copy()->subDay();
         while (count($days) < $count) {
-            if (!in_array($date->dayOfWeek, [0, 6])) {
+            if (! in_array($date->dayOfWeek, [0, 6])) {
                 $days[] = $date->format('Y-m-d');
             }
             $date->subDay();
         }
+
         return array_reverse($days);
     }
 }

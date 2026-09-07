@@ -2,6 +2,7 @@
 
 namespace App\Infrastructure\Models;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,7 +11,7 @@ class Attendance extends Model
     protected $table = 'attendances';
 
     protected $fillable = [
-        'student_id', 'section_id', 'user_id',
+        'student_id', 'section_id', 'subject_id', 'user_id',
         'date', 'code',
         'excuse_reason', 'document_url', 'updated_from',
     ];
@@ -29,8 +30,13 @@ class Attendance extends Model
         return $this->belongsTo(Section::class);
     }
 
+    public function subject(): BelongsTo
+    {
+        return $this->belongsTo(Subject::class);
+    }
+
     public function user(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class);
+        return $this->belongsTo(User::class);
     }
 }

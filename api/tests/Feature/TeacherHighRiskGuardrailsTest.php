@@ -20,11 +20,12 @@ class TeacherHighRiskGuardrailsTest extends TestCase
         $outsider = User::factory()->create(['role' => 'teacher', 'active' => true]);
         Sanctum::actingAs($outsider);
 
-        $this->getJson("/api/docente/attendance/{$context['section_id']}/2026-09-01")
+        $this->getJson("/api/docente/attendance/{$context['section_id']}/{$context['subject_id']}/2026-09-01")
             ->assertForbidden();
 
         $this->postJson('/api/docente/attendance', [
             'student_id' => $context['student_id'],
+            'subject_id' => $context['subject_id'],
             'date' => '2026-09-01',
             'status' => 'present',
         ])->assertForbidden();
@@ -39,6 +40,7 @@ class TeacherHighRiskGuardrailsTest extends TestCase
 
         $this->postJson('/api/docente/attendance', [
             'student_id' => $context['student_id'],
+            'subject_id' => $context['subject_id'],
             'date' => '2028-01-15',
             'status' => 'present',
         ])->assertUnprocessable();
@@ -51,7 +53,7 @@ class TeacherHighRiskGuardrailsTest extends TestCase
         $context = $this->academicContext();
         Sanctum::actingAs($context['teacher']);
 
-        $this->getJson("/api/docente/attendance/{$context['section_id']}/2026-09-01")
+        $this->getJson("/api/docente/attendance/{$context['section_id']}/{$context['subject_id']}/2026-09-01")
             ->assertOk()
             ->assertJsonCount(1, 'records')
             ->assertJsonPath('records.0.student_id', $context['student_id'])
@@ -70,7 +72,8 @@ class TeacherHighRiskGuardrailsTest extends TestCase
         $this->getJson('/api/docente/current-period')->assertOk()->assertJsonPath('period', null);
         $this->getJson('/api/docente/periods')->assertOk()->assertJsonPath('periods.0.status', 'upcoming');
         $this->postJson('/api/docente/attendance', [
-            'student_id' => $context['student_id'], 'date' => '2026-10-01', 'status' => 'present',
+            'student_id' => $context['student_id'], 'subject_id' => $context['subject_id'],
+            'date' => '2026-10-01', 'status' => 'present',
         ])->assertUnprocessable();
 
         $this->assertDatabaseCount('attendances', 0);
@@ -83,6 +86,7 @@ class TeacherHighRiskGuardrailsTest extends TestCase
 
         $this->postJson('/api/docente/attendance', [
             'student_id' => $context['student_id'],
+            'subject_id' => $context['subject_id'],
             'date' => '2026-09-01',
             'status' => 'late',
         ])->assertCreated()->assertJsonPath('alerts.consecutive', false);
@@ -90,7 +94,7 @@ class TeacherHighRiskGuardrailsTest extends TestCase
         $this->assertDatabaseHas('attendances', [
             'student_id' => $context['student_id'], 'code' => 'T',
         ]);
-        $this->getJson("/api/docente/attendance/{$context['section_id']}/2026-09-01")
+        $this->getJson("/api/docente/attendance/{$context['section_id']}/{$context['subject_id']}/2026-09-01")
             ->assertOk()->assertJsonPath('records.0.status', 'late');
     }
 
@@ -103,6 +107,7 @@ class TeacherHighRiskGuardrailsTest extends TestCase
         $attendanceId = DB::table('attendances')->insertGetId([
             'student_id' => $context['student_id'],
             'section_id' => $context['section_id'],
+            'subject_id' => $context['subject_id'],
             'user_id' => $otherTeacher->id,
             'date' => '2026-09-01',
             'code' => 'A',
@@ -114,12 +119,74 @@ class TeacherHighRiskGuardrailsTest extends TestCase
 
         $this->postJson('/api/docente/attendance', [
             'student_id' => $context['student_id'],
+            'subject_id' => $context['subject_id'],
             'date' => '2026-09-01',
             'status' => 'present',
         ])->assertForbidden();
         $this->patchJson("/api/docente/attendance/{$attendanceId}/excuse")->assertForbidden();
 
         $this->assertDatabaseHas('attendances', ['id' => $attendanceId, 'code' => 'A', 'user_id' => $otherTeacher->id]);
+    }
+
+    public function test_attendance_and_risk_are_isolated_by_subject_and_teacher(): void
+    {
+        $context = $this->academicContext();
+        $otherTeacher = User::factory()->create(['role' => 'teacher', 'active' => true]);
+        $otherSubjectId = DB::table('subjects')->insertGetId([
+            'name' => 'Lengua Española', 'code' => 'LEN', 'active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $otherOfferingId = DB::table('course_offerings')->insertGetId([
+            'section_id' => $context['section_id'], 'subject_id' => $otherSubjectId, 'active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->assignTeacher($otherTeacher->id, $otherOfferingId);
+
+        Sanctum::actingAs($context['teacher']);
+        foreach (['2026-09-01', '2026-09-02', '2026-09-03'] as $date) {
+            $this->postJson('/api/docente/attendance', [
+                'student_id' => $context['student_id'],
+                'subject_id' => $context['subject_id'],
+                'date' => $date,
+                'status' => 'absent',
+            ])->assertCreated();
+        }
+
+        $this->getJson("/api/docente/attendance/{$context['section_id']}/{$otherSubjectId}/2026-09-01")
+            ->assertForbidden();
+
+        Sanctum::actingAs($otherTeacher);
+        foreach (['2026-09-01', '2026-09-02', '2026-09-03'] as $date) {
+            $this->postJson('/api/docente/attendance', [
+                'student_id' => $context['student_id'],
+                'subject_id' => $otherSubjectId,
+                'date' => $date,
+                'status' => 'present',
+            ])->assertCreated();
+        }
+
+        $this->assertDatabaseCount('attendances', 6);
+        $this->getJson("/api/docente/attendance/{$context['section_id']}/{$otherSubjectId}/2026-09-01")
+            ->assertOk()
+            ->assertJsonPath('records.0.status', 'present');
+
+        $periodId = $context['period_ids'][0];
+        $this->getJson("/api/docente/dashboard?period_id={$periodId}")
+            ->assertOk()
+            ->assertJsonPath('attendance_avg', 100);
+        $this->getJson("/api/docente/risk/{$context['section_id']}/{$otherSubjectId}?period_id={$periodId}")
+            ->assertOk()
+            ->assertJsonCount(0, 'students');
+
+        Sanctum::actingAs($context['teacher']);
+        $this->getJson("/api/docente/dashboard?period_id={$periodId}")
+            ->assertOk()
+            ->assertJsonPath('attendance_avg', 0);
+        $this->getJson("/api/docente/risk/{$context['section_id']}/{$context['subject_id']}?period_id={$periodId}")
+            ->assertOk()
+            ->assertJsonCount(1, 'students')
+            ->assertJsonPath('students.0.attendance_pct', 0)
+            ->assertJsonPath('students.0.consecutive_absence_risk', true);
     }
 
     public function test_rp_does_not_persist_when_four_periods_are_not_available(): void
@@ -235,6 +302,7 @@ class TeacherHighRiskGuardrailsTest extends TestCase
         ]);
         DB::table('attendances')->insert([
             'student_id' => $context['student_id'], 'section_id' => $context['section_id'],
+            'subject_id' => $context['subject_id'],
             'user_id' => $context['teacher']->id, 'date' => '2026-08-15', 'code' => 'A',
             'created_at' => now(), 'updated_at' => now(),
         ]);

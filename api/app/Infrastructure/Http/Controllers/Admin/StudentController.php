@@ -104,6 +104,8 @@ class StudentController extends Controller
             'finalGrades.academicYear:id,name',
             'attendances' => fn ($query) => $query->latest('date'),
             'attendances.section.grade:id,name',
+            'attendances.subject:id,name',
+            'attendances.user:id,name',
             'observations' => fn ($query) => $query->latest('date'),
             'observations.user:id,name',
             'observations.subject:id,name',
