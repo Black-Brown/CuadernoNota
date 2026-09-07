@@ -14,6 +14,12 @@ CuadernoNota/
 └── docs/
 ```
 
+## Documentación
+
+- [Documentación funcional de la API](docs/API.md)
+- [Importación masiva de estudiantes](docs/importacion-estudiantes.md)
+- [Restablecimiento controlado de datos](docs/SYSTEM_DATA_RESET.md)
+
 ## Módulos
 
 ### Docente
