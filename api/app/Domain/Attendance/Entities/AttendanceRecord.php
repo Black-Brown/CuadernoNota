@@ -8,7 +8,7 @@ use DateTimeImmutable;
 
 /**
  * Entidad que representa el registro de asistencia de un estudiante
- * en una fecha concreta.
+ * en un curso (sección + materia) y una fecha concreta.
  *
  * Estados posibles:
  *  - present: El estudiante asistió.
@@ -27,21 +27,30 @@ use DateTimeImmutable;
 class AttendanceRecord
 {
     public const STATUS_PRESENT = 'present';
-    public const STATUS_ABSENT  = 'absent';
-    public const STATUS_LATE    = 'late';
+
+    public const STATUS_ABSENT = 'absent';
+
+    public const STATUS_LATE = 'late';
+
     public const STATUS_EXCUSED = 'excused';
 
     /**
-     * @param int               $id        Identificador único del registro
-     * @param int               $studentId ID del estudiante
-     * @param DateTimeImmutable $date      Fecha del registro de asistencia
-     * @param string            $status    Estado: present | late | absent | excused
+     * @param  int  $id  Identificador único del registro
+     * @param  int  $studentId  ID del estudiante
+     * @param  DateTimeImmutable  $date  Fecha del registro de asistencia
+     * @param  string  $status  Estado: present | late | absent | excused
+     * @param  int|null  $sectionId  Sección histórica del registro
+     * @param  int|null  $subjectId  Materia en la que se tomó asistencia
+     * @param  int|null  $teacherId  Docente que registró la asistencia
      */
     public function __construct(
-        public readonly int               $id,
-        public readonly int               $studentId,
+        public readonly int $id,
+        public readonly int $studentId,
         public readonly DateTimeImmutable $date,
-        public readonly string            $status = self::STATUS_PRESENT,
+        public readonly string $status = self::STATUS_PRESENT,
+        public readonly ?int $sectionId = null,
+        public readonly ?int $subjectId = null,
+        public readonly ?int $teacherId = null,
     ) {}
 
     /**

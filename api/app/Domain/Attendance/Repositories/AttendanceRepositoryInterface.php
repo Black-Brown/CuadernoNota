@@ -20,7 +20,7 @@ interface AttendanceRepositoryInterface
     /**
      * Persiste un nuevo registro de asistencia.
      *
-     * @param AttendanceRecord $record Entidad con el nuevo registro
+     * @param  AttendanceRecord  $record  Entidad con el nuevo registro
      */
     public function save(AttendanceRecord $record): void;
 
@@ -29,7 +29,7 @@ interface AttendanceRepositoryInterface
      * Se usa principalmente para cambiar el estado de absent a excused
      * cuando el estudiante presenta una justificación.
      *
-     * @param AttendanceRecord $record Entidad actualizada (mismo id, nuevo status)
+     * @param  AttendanceRecord  $record  Entidad actualizada (mismo id, nuevo status)
      */
     public function update(AttendanceRecord $record): void;
 
@@ -37,40 +37,21 @@ interface AttendanceRepositoryInterface
      * Obtiene un registro de asistencia por su ID.
      * Devuelve NULL si no existe.
      *
-     * @param int $id ID del registro
-     *
-     * @return AttendanceRecord|null
+     * @param  int  $id  ID del registro
      */
     public function findById(int $id): ?AttendanceRecord;
 
     /**
-     * Obtiene todos los registros de asistencia de un estudiante
-     * en un mes y año específicos, ordenados por fecha ascendente.
-     *
-     * Se usa en AttendanceAlertService para detectar ausencias
-     * consecutivas dentro del mes.
-     *
-     * @param int $studentId ID del estudiante
-     * @param int $year      Año (ej. 2025)
-     * @param int $month     Número de mes (1-12)
+     * Obtiene los registros del estudiante para la materia y el año escolar
+     * de la sección indicada, ordenados por fecha.
      *
      * @return AttendanceRecord[]
      */
-    public function findByStudentAndMonth(int $studentId, int $year, int $month): array;
-
-    /**
-     * Obtiene todos los registros de asistencia de un estudiante
-     * a lo largo de un año escolar completo.
-     *
-     * Se usa en AttendanceAlertService para calcular el porcentaje
-     * de asistencia anual.
-     *
-     * @param int $studentId ID del estudiante
-     * @param int $year      Año (ej. 2025)
-     *
-     * @return AttendanceRecord[]
-     */
-    public function findByStudentAndYear(int $studentId, int $year): array;
+    public function findByStudentAndCourseAcademicYear(
+        int $studentId,
+        int $sectionId,
+        int $subjectId,
+    ): array;
 
     /**
      * Devuelve el registro de asistencia de todos los estudiantes activos de
@@ -79,5 +60,5 @@ interface AttendanceRepositoryInterface
      *
      * @return array [['attendance_id', 'student_id', 'student_name', 'status'], ...]
      */
-    public function findBySectionAndDate(int $sectionId, string $date): array;
+    public function findByCourseAndDate(int $sectionId, int $subjectId, string $date): array;
 }

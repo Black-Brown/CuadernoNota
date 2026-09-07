@@ -120,8 +120,8 @@ export default function Reports() {
           <div className="mb-3 flex justify-end">
             <button
               onClick={() => downloadCsv(`reporte-asistencia-${safeFilename(yearName)}`, [
-                ['Grado', 'Sección', 'Registros', 'Asistieron (P + T)', 'Ausentes', 'Tardanzas', 'Excusas'],
-                ...attendanceRows.map((r) => [r.grade, r.section, r.records, r.present, r.absent, r.late, r.excused]),
+                ['Grado', 'Sección', 'Materia', 'Registros', 'Asistieron (P + T)', 'Ausentes', 'Tardanzas', 'Excusas'],
+                ...attendanceRows.map((r) => [r.grade, r.section, r.subject, r.records, r.present, r.absent, r.late, r.excused]),
               ])}
               disabled={attendanceRows.length === 0}
               className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
@@ -134,12 +134,13 @@ export default function Reports() {
           <DataTable
             loading={attendance.isLoading}
             rows={attendanceRows}
-            rowKey={(r, i) => `${r.grade}-${r.section}-${i}`}
+            rowKey={(r, i) => `${r.grade}-${r.section}-${r.subject}-${i}`}
             emptyIcon="fact_check"
             emptyTitle="No hay registros de asistencia para este año."
             columns={[
               { key: 'grade', label: 'Grado' },
               { key: 'section', label: 'Sección' },
+              { key: 'subject', label: 'Materia' },
               { key: 'records', label: 'Registros', align: 'center' },
               { key: 'present', label: 'Asistieron', align: 'center' },
               { key: 'absent', label: 'Ausentes', align: 'center' },

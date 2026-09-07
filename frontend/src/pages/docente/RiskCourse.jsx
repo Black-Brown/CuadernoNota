@@ -107,7 +107,7 @@ export default function RiskCourse() {
         student.enrollment_no,
         riskLabels[student.risk_level] || student.risk_level,
         student.average_grade ?? 'Sin registro',
-        `${student.attendance_pct}%`,
+        student.attendance_pct == null ? 'Sin registros' : `${student.attendance_pct}%`,
         student.active_alerts ?? 0,
         student.academic_risk ? 'Si' : 'No',
         student.attendance_risk ? 'Si' : 'No',
@@ -258,10 +258,10 @@ export default function RiskCourse() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <span className={`w-12 font-mono text-sm font-bold ${metricColor(student.attendance_pct, 70, 80)}`}>
-                          {student.attendance_pct}%
+                          {student.attendance_pct == null ? '—' : `${student.attendance_pct}%`}
                         </span>
                         <div className="h-2 min-w-[110px] flex-1 overflow-hidden rounded-full bg-slate-100">
-                          <div className={`h-full rounded-full ${progressColor(student.attendance_pct, 70, 80)}`} style={{ width: `${Math.max(4, student.attendance_pct)}%` }} />
+                          <div className={`h-full rounded-full ${progressColor(student.attendance_pct, 70, 80)}`} style={{ width: `${student.attendance_pct == null ? 0 : Math.max(4, student.attendance_pct)}%` }} />
                         </div>
                       </div>
                     </td>

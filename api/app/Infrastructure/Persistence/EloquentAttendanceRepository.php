@@ -9,6 +9,7 @@ use App\Infrastructure\Models\Section as SectionModel;
 use App\Infrastructure\Models\Student as StudentModel;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Auth;
+use InvalidArgumentException;
 
 class EloquentAttendanceRepository implements AttendanceRepositoryInterface
 {
@@ -26,28 +27,34 @@ class EloquentAttendanceRepository implements AttendanceRepositoryInterface
     /** Mapeo de status dominio → código DB. */
     private const STATUS_TO_CODE = [
         AttendanceRecord::STATUS_PRESENT => 'P',
-        AttendanceRecord::STATUS_ABSENT  => 'A',
-        AttendanceRecord::STATUS_LATE    => 'T',
+        AttendanceRecord::STATUS_ABSENT => 'A',
+        AttendanceRecord::STATUS_LATE => 'T',
         AttendanceRecord::STATUS_EXCUSED => 'E',
     ];
 
     /**
      * Persiste un registro de asistencia.
-     * Obtiene section_id del estudiante para cumplir el FK requerido.
+     * La materia es obligatoria para todo registro nuevo.
      */
     public function save(AttendanceRecord $record): void
     {
         $student = StudentModel::findOrFail($record->studentId);
+        $sectionId = $record->sectionId ?? $student->section_id;
+
+        if ($record->subjectId === null) {
+            throw new InvalidArgumentException('La materia es obligatoria para registrar asistencia.');
+        }
 
         AttendanceModel::updateOrCreate(
             [
                 'student_id' => $record->studentId,
-                'date'       => $record->date->format('Y-m-d'),
+                'subject_id' => $record->subjectId,
+                'date' => $record->date->format('Y-m-d'),
             ],
             [
-                'section_id' => $student->section_id,
-                'user_id'    => Auth::id() ?? 1,
-                'code'       => self::STATUS_TO_CODE[$record->status] ?? 'A',
+                'section_id' => $sectionId,
+                'user_id' => $record->teacherId ?? Auth::id() ?? 1,
+                'code' => self::STATUS_TO_CODE[$record->status] ?? 'A',
             ]
         );
     }
@@ -66,34 +73,30 @@ class EloquentAttendanceRepository implements AttendanceRepositoryInterface
         return $model ? $this->toEntity($model) : null;
     }
 
-    /** Registros de un estudiante en un mes, ordenados por fecha asc. */
-    public function findByStudentAndMonth(int $studentId, int $year, int $month): array
-    {
+    public function findByStudentAndCourseAcademicYear(
+        int $studentId,
+        int $sectionId,
+        int $subjectId,
+    ): array {
+        $section = SectionModel::with('academicYear')->findOrFail($sectionId);
+
         return AttendanceModel::where('student_id', $studentId)
-            ->whereYear('date', $year)
-            ->whereMonth('date', $month)
+            ->where('section_id', $sectionId)
+            ->where('subject_id', $subjectId)
+            ->whereDate('date', '>=', $section->academicYear->start_date)
+            ->whereDate('date', '<=', $section->academicYear->end_date)
             ->orderBy('date')
             ->get()
-            ->map(fn($m) => $this->toEntity($m))
+            ->map(fn ($model) => $this->toEntity($model))
             ->all();
     }
 
-    /** Todos los registros del año para calcular el porcentaje anual. */
-    public function findByStudentAndYear(int $studentId, int $year): array
+    public function findByCourseAndDate(int $sectionId, int $subjectId, string $date): array
     {
-        return AttendanceModel::where('student_id', $studentId)
-            ->whereYear('date', $year)
-            ->orderBy('date')
-            ->get()
-            ->map(fn($m) => $this->toEntity($m))
-            ->all();
-    }
-
-    public function findBySectionAndDate(int $sectionId, string $date): array
-    {
-        $section = SectionModel::with(['students' => fn($q) => $q->where('active', true)->orderBy('last_name')])->findOrFail($sectionId);
+        $section = SectionModel::with(['students' => fn ($q) => $q->where('active', true)->orderBy('last_name')])->findOrFail($sectionId);
 
         $existing = AttendanceModel::where('section_id', $sectionId)
+            ->where('subject_id', $subjectId)
             ->whereDate('date', $date)
             ->get()
             ->keyBy('student_id');
@@ -105,9 +108,9 @@ class EloquentAttendanceRepository implements AttendanceRepositoryInterface
 
             return [
                 'attendance_id' => $attendance?->id,
-                'student_id'    => $student->id,
-                'student_name'  => $student->last_name . ', ' . $student->name,
-                'status'        => $attendance ? ($codeToStatus[$attendance->code] ?? null) : null,
+                'student_id' => $student->id,
+                'student_name' => $student->last_name.', '.$student->name,
+                'status' => $attendance ? ($codeToStatus[$attendance->code] ?? null) : null,
             ];
         })->all();
     }
@@ -116,10 +119,13 @@ class EloquentAttendanceRepository implements AttendanceRepositoryInterface
     private function toEntity(AttendanceModel $model): AttendanceRecord
     {
         return new AttendanceRecord(
-            id:        $model->id,
+            id: $model->id,
             studentId: $model->student_id,
-            date:      new DateTimeImmutable($model->date->format('Y-m-d')),
-            status:    self::CODE_TO_STATUS[$model->code] ?? AttendanceRecord::STATUS_ABSENT,
+            date: new DateTimeImmutable($model->date->format('Y-m-d')),
+            status: self::CODE_TO_STATUS[$model->code] ?? AttendanceRecord::STATUS_ABSENT,
+            sectionId: $model->section_id,
+            subjectId: $model->subject_id,
+            teacherId: $model->user_id,
         );
     }
 }

@@ -14,9 +14,13 @@ use Illuminate\Validation\ValidationException;
 class RiskController extends Controller
 {
     private const ACADEMIC_RISK_THRESHOLD = 70.0;
+
     private const HIGH_RISK_THRESHOLD = 60.0;
+
     private const ATTENDANCE_RISK_THRESHOLD = 80.0;
+
     private const HIGH_ATTENDANCE_RISK_THRESHOLD = 70.0;
+
     private const CONSECUTIVE_ABSENCE_THRESHOLD = 3;
 
     public function index(Request $request): JsonResponse
@@ -26,7 +30,7 @@ class RiskController extends Controller
         $academicYearId = $this->periodAcademicYearId($periodId);
 
         $courses = $this->teacherCourses($teacherId, $academicYearId)
-            ->map(fn(object $course): array => $this->courseRiskSummary($course, $periodId))
+            ->map(fn (object $course): array => $this->courseRiskSummary($course, $periodId))
             ->values();
 
         return response()->json([
@@ -56,8 +60,8 @@ class RiskController extends Controller
                 'total_students_at_risk' => $students->count(),
                 'high_risk_students' => $students->where('risk_level', 'high')->count(),
                 'medium_risk_students' => $students->where('risk_level', 'medium')->count(),
-                'attendance_alerts' => $students->filter(fn(array $student): bool => $student['attendance_risk'])->count(),
-                'competency_alerts' => $students->filter(fn(array $student): bool => $student['competency_risk'])->count(),
+                'attendance_alerts' => $students->filter(fn (array $student): bool => $student['attendance_risk'])->count(),
+                'competency_alerts' => $students->filter(fn (array $student): bool => $student['competency_risk'])->count(),
             ],
             'students' => $students->values(),
         ]);
@@ -75,7 +79,7 @@ class RiskController extends Controller
             ->where('active', true)
             ->first();
 
-        if (!$student) {
+        if (! $student) {
             return response()->json(['message' => 'El estudiante no pertenece a este curso.'], 404);
         }
 
@@ -157,9 +161,9 @@ class RiskController extends Controller
     private function assignedCourse(int $teacherId, int $sectionId, int $subjectId, int $academicYearId): object
     {
         $course = $this->teacherCourses($teacherId, $academicYearId)
-            ->first(fn(object $course): bool => (int) $course->section_id === $sectionId && (int) $course->subject_id === $subjectId);
+            ->first(fn (object $course): bool => (int) $course->section_id === $sectionId && (int) $course->subject_id === $subjectId);
 
-        if (!$course) {
+        if (! $course) {
             throw new AuthorizationException('No tienes permiso para consultar este curso.');
         }
 
@@ -170,14 +174,18 @@ class RiskController extends Controller
     {
         $students = $this->riskStudents((int) $course->section_id, (int) $course->subject_id, $periodId);
         $groupAverage = $this->groupAverage((int) $course->section_id, (int) $course->subject_id, $periodId);
-        $attendancePct = $this->sectionAttendancePercentage((int) $course->section_id, $periodId);
+        $attendancePct = $this->sectionAttendancePercentage(
+            (int) $course->section_id,
+            (int) $course->subject_id,
+            $periodId,
+        );
         $riskPressure = min(100, (int) round(($students->count() / max(1, $this->activeStudentCount((int) $course->section_id))) * 100));
 
         return array_merge($this->coursePayload($course), [
             'at_risk_count' => $students->count(),
             'high_risk_count' => $students->where('risk_level', 'high')->count(),
-            'attendance_alert_count' => $students->filter(fn(array $student): bool => $student['attendance_risk'])->count(),
-            'competency_alert_count' => $students->filter(fn(array $student): bool => $student['competency_risk'])->count(),
+            'attendance_alert_count' => $students->filter(fn (array $student): bool => $student['attendance_risk'])->count(),
+            'competency_alert_count' => $students->filter(fn (array $student): bool => $student['competency_risk'])->count(),
             'attendance_pct' => $attendancePct,
             'avg_grade' => $groupAverage,
             'risk_pressure' => $riskPressure,
@@ -207,8 +215,8 @@ class RiskController extends Controller
             ->orderBy('last_name')
             ->orderBy('name')
             ->get()
-            ->map(fn(object $student): array => $this->buildStudentRisk($student, $sectionId, $subjectId, $periodId))
-            ->filter(fn(array $student): bool => $student['is_at_risk'])
+            ->map(fn (object $student): array => $this->buildStudentRisk($student, $sectionId, $subjectId, $periodId))
+            ->filter(fn (array $student): bool => $student['is_at_risk'])
             ->sortByDesc('risk_score')
             ->values();
     }
@@ -231,13 +239,13 @@ class RiskController extends Controller
             'c3' => $periodGrade?->c3_score !== null ? (float) $periodGrade->c3_score : null,
         ];
 
-        $attendancePct = $this->studentAttendancePercentage((int) $student->id, $periodId);
-        $hasConsecutiveAbsences = $this->hasConsecutiveAbsences((int) $student->id, $periodId);
+        $attendancePct = $this->studentAttendancePercentage((int) $student->id, $subjectId, $periodId);
+        $hasConsecutiveAbsences = $this->hasConsecutiveAbsences((int) $student->id, $subjectId, $periodId);
         $activeAlerts = $this->activeAlertCount((int) $student->id);
-        $weakCompetencies = collect($competencies)->filter(fn(?float $score): bool => $score !== null && $score < self::ACADEMIC_RISK_THRESHOLD);
+        $weakCompetencies = collect($competencies)->filter(fn (?float $score): bool => $score !== null && $score < self::ACADEMIC_RISK_THRESHOLD);
 
         $academicRisk = $averageGrade !== null && $averageGrade < self::ACADEMIC_RISK_THRESHOLD;
-        $attendanceRisk = $attendancePct < self::ATTENDANCE_RISK_THRESHOLD || $hasConsecutiveAbsences;
+        $attendanceRisk = ($attendancePct !== null && $attendancePct < self::ATTENDANCE_RISK_THRESHOLD) || $hasConsecutiveAbsences;
         $competencyRisk = $weakCompetencies->isNotEmpty();
         $isAtRisk = $academicRisk || $attendanceRisk || $competencyRisk || $activeAlerts > 0;
         $riskScore = $this->riskScore($averageGrade, $attendancePct, $hasConsecutiveAbsences, $weakCompetencies->count(), $activeAlerts);
@@ -251,7 +259,7 @@ class RiskController extends Controller
             'effective_grade' => $averageGrade,
             'period_score' => $periodGrade?->period_score !== null ? (float) $periodGrade->period_score : null,
             'rp_score' => $periodGrade?->rp_score !== null ? (float) $periodGrade->rp_score : null,
-            'attendance_pct' => round($attendancePct, 2),
+            'attendance_pct' => $attendancePct !== null ? round($attendancePct, 2) : null,
             'competency_average' => $this->competencyAverage($competencies),
             'critical_competency' => $this->criticalCompetency($competencies),
             'weak_competencies' => $weakCompetencies->keys()->values(),
@@ -355,10 +363,13 @@ class RiskController extends Controller
     {
         return DB::table('alerts')
             ->where('student_id', $studentId)
+            // Legacy attendance alerts have no subject_id, so showing them here
+            // would attribute one subject's absence to every course.
+            ->whereNotIn('type', ['consecutive_absences', 'attendance_percentage'])
             ->orderByDesc('created_at')
             ->limit(10)
             ->get()
-            ->map(fn(object $alert): array => [
+            ->map(fn (object $alert): array => [
                 'id' => (int) $alert->id,
                 'type' => $alert->type,
                 'message' => $alert->message,
@@ -378,7 +389,7 @@ class RiskController extends Controller
             ->limit(10)
             ->select('observations.id', 'observations.date', 'observations.type', 'observations.description', 'users.name as author_name')
             ->get()
-            ->map(fn(object $observation): array => [
+            ->map(fn (object $observation): array => [
                 'id' => (int) $observation->id,
                 'date' => $observation->date,
                 'type' => $observation->type,
@@ -388,64 +399,63 @@ class RiskController extends Controller
             ->all();
     }
 
-    private function studentAttendancePercentage(int $studentId, int $periodId): float
+    private function studentAttendancePercentage(int $studentId, int $subjectId, int $periodId): ?float
     {
-        $records = $this->attendanceForPeriod($periodId)
+        $records = $this->attendanceForPeriod($periodId, $subjectId)
             ->where('student_id', $studentId)
             ->get(['code']);
 
         if ($records->isEmpty()) {
-            return 100.0;
+            return null;
         }
 
         return ($records->whereIn('code', ['P', 'T'])->count() / $records->count()) * 100.0;
     }
 
-    private function sectionAttendancePercentage(int $sectionId, int $periodId): float
+    private function sectionAttendancePercentage(int $sectionId, int $subjectId, int $periodId): ?float
     {
-        $records = $this->attendanceForPeriod($periodId)
+        $records = $this->attendanceForPeriod($periodId, $subjectId)
             ->where('section_id', $sectionId)
             ->get(['code']);
 
         if ($records->isEmpty()) {
-            return 100.0;
+            return null;
         }
 
         return round(($records->whereIn('code', ['P', 'T'])->count() / $records->count()) * 100.0, 2);
     }
 
-    private function hasConsecutiveAbsences(int $studentId, int $periodId): bool
+    private function hasConsecutiveAbsences(int $studentId, int $subjectId, int $periodId): bool
     {
-        $records = $this->attendanceForPeriod($periodId)
+        $records = $this->attendanceForPeriod($periodId, $subjectId)
             ->where('student_id', $studentId)
             ->orderBy('date')
-            ->get(['date', 'code'])
-            ->groupBy(fn(object $record): string => substr((string) $record->date, 0, 7));
+            ->get(['date', 'code']);
 
-        foreach ($records as $monthRecords) {
-            $streak = 0;
+        $streak = 0;
 
-            foreach ($monthRecords as $record) {
-                if ($record->code === 'A') {
-                    $streak++;
-                    if ($streak >= self::CONSECUTIVE_ABSENCE_THRESHOLD) {
-                        return true;
-                    }
-                    continue;
+        foreach ($records as $record) {
+            if ($record->code === 'A') {
+                $streak++;
+                if ($streak >= self::CONSECUTIVE_ABSENCE_THRESHOLD) {
+                    return true;
                 }
 
-                $streak = 0;
+                continue;
             }
+
+            $streak = 0;
         }
 
         return false;
     }
 
-    private function attendanceForPeriod(int $periodId)
+    private function attendanceForPeriod(int $periodId, int $subjectId)
     {
         $period = DB::table('periods')->where('id', $periodId)->first(['start_date', 'end_date']);
 
         return DB::table('attendances')
+            ->where('subject_id', $subjectId)
             ->whereDate('date', '>=', $period->start_date)
             ->whereDate('date', '<=', $period->end_date);
     }
@@ -455,6 +465,7 @@ class RiskController extends Controller
         return DB::table('alerts')
             ->where('student_id', $studentId)
             ->where('resolved', false)
+            ->whereNotIn('type', ['consecutive_absences', 'attendance_percentage'])
             ->count();
     }
 
@@ -478,7 +489,7 @@ class RiskController extends Controller
         return $avg !== null ? round((float) $avg, 2) : null;
     }
 
-    private function riskScore(?float $averageGrade, float $attendancePct, bool $hasConsecutiveAbsences, int $weakCompetencies, int $activeAlerts): int
+    private function riskScore(?float $averageGrade, ?float $attendancePct, bool $hasConsecutiveAbsences, int $weakCompetencies, int $activeAlerts): int
     {
         $score = 0;
 
@@ -486,7 +497,7 @@ class RiskController extends Controller
             $score += $averageGrade < self::HIGH_RISK_THRESHOLD ? 40 : 25;
         }
 
-        if ($attendancePct < self::ATTENDANCE_RISK_THRESHOLD) {
+        if ($attendancePct !== null && $attendancePct < self::ATTENDANCE_RISK_THRESHOLD) {
             $score += $attendancePct < self::HIGH_ATTENDANCE_RISK_THRESHOLD ? 30 : 18;
         }
 
@@ -509,13 +520,13 @@ class RiskController extends Controller
         };
     }
 
-    private function courseRiskLevel(int $atRiskCount, int $highRiskCount, ?float $groupAverage, float $attendancePct): string
+    private function courseRiskLevel(int $atRiskCount, int $highRiskCount, ?float $groupAverage, ?float $attendancePct): string
     {
-        if ($highRiskCount > 0 || ($groupAverage !== null && $groupAverage < self::HIGH_RISK_THRESHOLD) || $attendancePct < self::HIGH_ATTENDANCE_RISK_THRESHOLD) {
+        if ($highRiskCount > 0 || ($groupAverage !== null && $groupAverage < self::HIGH_RISK_THRESHOLD) || ($attendancePct !== null && $attendancePct < self::HIGH_ATTENDANCE_RISK_THRESHOLD)) {
             return 'high';
         }
 
-        if ($atRiskCount > 0 || ($groupAverage !== null && $groupAverage < self::ACADEMIC_RISK_THRESHOLD) || $attendancePct < self::ATTENDANCE_RISK_THRESHOLD) {
+        if ($atRiskCount > 0 || ($groupAverage !== null && $groupAverage < self::ACADEMIC_RISK_THRESHOLD) || ($attendancePct !== null && $attendancePct < self::ATTENDANCE_RISK_THRESHOLD)) {
             return 'medium';
         }
 
@@ -524,7 +535,7 @@ class RiskController extends Controller
 
     private function competencyAverage(array $competencies): ?float
     {
-        $values = collect($competencies)->filter(fn(?float $score): bool => $score !== null);
+        $values = collect($competencies)->filter(fn (?float $score): bool => $score !== null);
 
         return $values->isEmpty() ? null : round($values->avg(), 2);
     }
@@ -532,7 +543,7 @@ class RiskController extends Controller
     private function criticalCompetency(array $competencies): ?string
     {
         return collect($competencies)
-            ->filter(fn(?float $score): bool => $score !== null)
+            ->filter(fn (?float $score): bool => $score !== null)
             ->sort()
             ->keys()
             ->first();

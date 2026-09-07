@@ -88,7 +88,7 @@ export default function App() {
                   <Route path="courses/:sectionId/:subjectId" element={<Workspace />} />
                   <Route path="courses/:sectionId/:subjectId/activity/:activityId" element={<ActivityGrades />} />
                   <Route path="attendance" element={<Attendance />} />
-                  <Route path="attendance/:sectionId" element={<Attendance />} />
+                  <Route path="attendance/:sectionId/:subjectId" element={<Attendance />} />
                   <Route path="observations" element={<Observations />} />
                   <Route path="observations/:sectionId/:subjectId" element={<Observations />} />
                   <Route path="*" element={<ModuleComingSoon title="Pagina en produccion" />} />

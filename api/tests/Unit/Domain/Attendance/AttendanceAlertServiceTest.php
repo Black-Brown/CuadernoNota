@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domain\Attendance;
 
-use DateTimeImmutable;
-use Tests\TestCase;
 use App\Domain\Attendance\Entities\AttendanceRecord;
 use App\Domain\Attendance\Services\AttendanceAlertService;
+use DateTimeImmutable;
+use Tests\TestCase;
 
 /**
  * Tests del AttendanceAlertService.
  *
  * Cubre las dos reglas de alerta del sistema:
  *  Regla 1 — Ausencias consecutivas: 3 o más ausencias no justificadas
- *            seguidas en el mismo mes activan la alerta.
+ *            seguidas en la materia activan la alerta.
  *  Regla 2 — Asistencia anual: porcentaje de días presentes < 80 %
  *            activa la alerta.
  */
@@ -25,7 +25,7 @@ class AttendanceAlertServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new AttendanceAlertService();
+        $this->service = new AttendanceAlertService;
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -35,16 +35,16 @@ class AttendanceAlertServiceTest extends TestCase
     /**
      * Crea un AttendanceRecord con los datos mínimos necesarios para los tests.
      *
-     * @param string $date   Fecha en formato 'Y-m-d'
-     * @param string $status present | absent | excused
+     * @param  string  $date  Fecha en formato 'Y-m-d'
+     * @param  string  $status  present | absent | excused
      */
     private function makeRecord(string $date, string $status): AttendanceRecord
     {
         return new AttendanceRecord(
-            id:        1,
+            id: 1,
             studentId: 1,
-            date:      new DateTimeImmutable($date),
-            status:    $status,
+            date: new DateTimeImmutable($date),
+            status: $status,
         );
     }
 
@@ -136,6 +136,17 @@ class AttendanceAlertServiceTest extends TestCase
             $this->makeRecord('2025-10-03', AttendanceRecord::STATUS_ABSENT),
             $this->makeRecord('2025-10-01', AttendanceRecord::STATUS_ABSENT),
             $this->makeRecord('2025-10-02', AttendanceRecord::STATUS_ABSENT),
+        ];
+
+        $this->assertTrue($this->service->hasConsecutiveAbsenceAlert($records));
+    }
+
+    public function test_ausencias_consecutivas_no_se_reinician_al_cambiar_de_mes(): void
+    {
+        $records = [
+            $this->makeRecord('2025-09-29', AttendanceRecord::STATUS_ABSENT),
+            $this->makeRecord('2025-09-30', AttendanceRecord::STATUS_ABSENT),
+            $this->makeRecord('2025-10-01', AttendanceRecord::STATUS_ABSENT),
         ];
 
         $this->assertTrue($this->service->hasConsecutiveAbsenceAlert($records));
