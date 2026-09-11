@@ -4,6 +4,7 @@ namespace App\Infrastructure\Http\Controllers\Docente;
 
 use App\Application\Grade\GetActivitiesBySubject;
 use App\Application\Grade\GetActivityGrades;
+use App\Application\Grade\GetGradeSubmissionReadiness;
 use App\Application\Grade\GetGradebookSummary;
 use App\Application\Grade\GetPeriodGrades;
 use App\Application\Grade\GetTeacherCourses;
@@ -29,6 +30,7 @@ class GradeController extends Controller
         private readonly GetActivityGrades      $getActivityGrades,
         private readonly GetGradebookSummary    $getGradebookSummary,
         private readonly GetPeriodGrades        $getPeriodGrades,
+        private readonly GetGradeSubmissionReadiness $getGradeSubmissionReadiness,
         private readonly SubmitGrades           $submitGrades,
         private readonly RegisterRecovery       $registerRecovery,
         private readonly FinalGradeRepositoryInterface $finalGradeRepo,
@@ -129,8 +131,12 @@ class GradeController extends Controller
         }
 
         $grades = $this->getPeriodGrades->execute($subjectId, $periodId, $sectionId);
+        $submission = $this->getGradeSubmissionReadiness->execute($subjectId, $periodId, $sectionId);
 
-        return response()->json(['grades' => $grades]);
+        return response()->json([
+            'grades' => $grades,
+            'submission' => $submission,
+        ]);
     }
 
     public function submit(Request $request): JsonResponse
@@ -149,9 +155,14 @@ class GradeController extends Controller
             return response()->json(['message' => 'No tienes permiso para enviar notas de este curso.'], 403);
         }
 
-        if (!$this->isPeriodOpen((int) $validated['period_id'])) {
+        $period = Period::find((int) $validated['period_id']);
+        $periodStatus = $period?->effectiveStatus();
+
+        if ($periodStatus !== 'ended') {
             return response()->json([
-                'message' => 'Este período está cerrado. Solicita permiso al coordinador para modificarlo.',
+                'message' => in_array($periodStatus, ['open', 'upcoming'], true)
+                    ? 'El envío a revisión se habilita cuando finalice el período.'
+                    : 'Este período ya no admite nuevos envíos a revisión.',
             ], 423);
         }
 
@@ -165,9 +176,43 @@ class GradeController extends Controller
             ], 423);
         }
 
-        $this->submitGrades->execute($validated['subject_id'], $validated['period_id'], $validated['section_id']);
+        $readiness = $this->getGradeSubmissionReadiness->execute(
+            (int) $validated['subject_id'],
+            (int) $validated['period_id'],
+            (int) $validated['section_id'],
+        );
 
-        return response()->json(['message' => 'Notas enviadas a revisión correctamente.']);
+        if (! $readiness['ready']) {
+            $message = $readiness['total_students'] === 0
+                ? 'No hay estudiantes activos en esta sección para enviar.'
+                : "Faltan calificaciones completas de {$readiness['pending_students']} estudiante(s).";
+
+            return response()->json([
+                'message' => $message,
+                'submission' => $readiness,
+            ], 422);
+        }
+
+        $submitted = $this->submitGrades->execute(
+            (int) $validated['subject_id'],
+            (int) $validated['period_id'],
+            (int) $validated['section_id'],
+        );
+
+        if ($submitted !== $readiness['total_students']) {
+            return response()->json([
+                'message' => 'Las calificaciones cambiaron durante el envío. Actualiza el workspace e inténtalo nuevamente.',
+            ], 409);
+        }
+
+        return response()->json([
+            'message' => 'Notas enviadas a revisión correctamente.',
+            'submission' => [
+                ...$readiness,
+                'ready' => false,
+                'submitted_count' => $submitted,
+            ],
+        ]);
     }
 
     public function recovery(Request $request): JsonResponse

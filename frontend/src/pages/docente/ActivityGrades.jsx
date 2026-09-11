@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCourses } from '../../api/courses.api';
-import { getActivitiesBySubject, getActivityGrades, getPeriodGrades, saveActivityScore, submitGrades } from '../../api/grades.api';
+import { getActivitiesBySubject, getActivityGrades, getPeriodGrades, saveActivityScore } from '../../api/grades.api';
 import { getCurrentPeriod } from '../../api/periods.api';
 import DashboardLayout from '../../components/DashboardLayout';
 import usePeriodStore from '../../store/periodStore';
@@ -17,6 +17,8 @@ export default function ActivityGrades() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType]       = useState('success');
   const [isSavingAll, setIsSavingAll]   = useState(false);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentFilter, setStudentFilter] = useState('all');
   const pendingSaveTimersRef = useRef(new Map());
   const cellSaveChainsRef = useRef(new Map());
   const failedCellValuesRef = useRef(new Map());
@@ -76,7 +78,7 @@ export default function ActivityGrades() {
   const canEditGrades = canEditPeriodGrades && currentActivity?.active === true;
 
   // Fetch grades — pass sectionId so backend returns the correct section's students
-  const { data: activityGradesData } = useQuery({
+  const { data: activityGradesData, isLoading: isLoadingActivityGrades } = useQuery({
     queryKey: ['activityGrades', activityId, period?.id, sectionId],
     queryFn:  () => getActivityGrades(activityId, period.id, sectionId),
     enabled:  !!activityId && !!period?.id && !!sectionId && currentActivity?.active === true,
@@ -164,21 +166,6 @@ export default function ActivityGrades() {
       throw error;
     });
   }, [persistCellScore, reportSaveError, saveScope]);
-
-  const submitGradesMutation = useMutation({
-    mutationFn: submitGrades,
-    onSuccess:  () => {
-      queryClient.invalidateQueries({ queryKey: ['periodGrades', subjectId, period?.id, sectionId] });
-      queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, period?.id] });
-      showToast('Calificaciones enviadas y finalizadas correctamente.');
-    },
-    onError: (error) => {
-      showToast(
-        error?.response?.data?.message ?? 'No fue posible finalizar las calificaciones.',
-        'error'
-      );
-    },
-  });
 
   // Update immediately and persist after a short pause so typing "100" produces
   // one ordered request instead of three competing writes (1, 10 and 100).
@@ -270,19 +257,6 @@ export default function ActivityGrades() {
     return true;
   }, [period, canEditGrades, persistCellScore, refreshGradeData, saveScope, showToast]);
 
-  const handleSubmitGrades = useCallback(async () => {
-    if (!period || !canEditGrades) return;
-
-    const saved = await saveAll(false);
-    if (!saved) return;
-
-    submitGradesMutation.mutate({
-      subject_id: Number(subjectId),
-      period_id: period.id,
-      section_id: Number(sectionId),
-    });
-  }, [period, canEditGrades, saveAll, submitGradesMutation, subjectId, sectionId]);
-
   // Ctrl+Enter shortcut
   useEffect(() => {
     const handler = (e) => {
@@ -305,6 +279,40 @@ export default function ActivityGrades() {
   const numericTotals = localScores
     .map(s => calcTotal(s.c1, s.c2, s.c3))
     .filter(t => t !== null);
+
+  const hasScore = (value) => value !== '' && value !== null && value !== undefined && !Number.isNaN(Number(value));
+  const isComplete = (student) => ['c1', 'c2', 'c3'].every((key) => hasScore(student[key]));
+  const normalizeSearch = (value) => String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es')
+    .trim();
+  const searchNeedle = normalizeSearch(studentSearch);
+  const filteredScores = localScores.filter((student) => {
+    const total = calcTotal(student.c1, student.c2, student.c3);
+    const matchesSearch = !searchNeedle || normalizeSearch(
+      `${student.student_name} ${student.enrollment_no ?? ''}`
+    ).includes(searchNeedle);
+    const matchesFilter = studentFilter === 'all'
+      || (studentFilter === 'complete' && isComplete(student))
+      || (studentFilter === 'pending' && !isComplete(student))
+      || (studentFilter === 'risk' && total !== null && total < 70);
+
+    return matchesSearch && matchesFilter;
+  });
+  const studentFilterOptions = [
+    { key: 'all', label: 'Todos', count: localScores.length },
+    { key: 'complete', label: 'Completos', count: localScores.filter(isComplete).length },
+    { key: 'pending', label: 'Pendientes', count: localScores.filter((student) => !isComplete(student)).length },
+    {
+      key: 'risk',
+      label: 'En riesgo',
+      count: localScores.filter((student) => {
+        const total = calcTotal(student.c1, student.c2, student.c3);
+        return total !== null && total < 70;
+      }).length,
+    },
+  ];
 
   const groupAvg    = numericTotals.length > 0
     ? (numericTotals.reduce((a, b) => a + b, 0) / numericTotals.length).toFixed(1)
@@ -400,14 +408,6 @@ export default function ActivityGrades() {
             {isSavingAll && <span className="material-symbols-outlined animate-spin text-[16px]">sync</span>}
             {isSavingAll ? 'Guardando...' : 'Guardar Progreso'}
           </button>
-          <button
-            onClick={handleSubmitGrades}
-            disabled={!period || submitGradesMutation.isPending || isSavingAll || !canEditGrades}
-            className="px-4 py-2 bg-slate-950 text-white hover:bg-slate-900 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span className="material-symbols-outlined text-[18px]">check_circle</span>
-            Finalizar Calificación
-          </button>
         </div>
       </div>
 
@@ -487,6 +487,50 @@ export default function ActivityGrades() {
         </div>
       )}
 
+      <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative w-full lg:max-w-sm">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[19px] text-slate-400">
+              search
+            </span>
+            <input
+              type="search"
+              value={studentSearch}
+              onChange={(event) => setStudentSearch(event.target.value)}
+              placeholder="Buscar por nombre o matrícula..."
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none transition-colors focus:border-indigo-400 focus:bg-white focus:ring-1 focus:ring-indigo-400"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {studentFilterOptions.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setStudentFilter(option.key)}
+                aria-pressed={studentFilter === option.key}
+                className={`rounded-lg px-3 py-2 text-[11px] font-extrabold transition-colors ${
+                  studentFilter === option.key
+                    ? 'bg-slate-950 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {option.label}
+                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] ${
+                  studentFilter === option.key ? 'bg-white/15 text-white' : 'bg-white text-slate-500'
+                }`}>
+                  {option.count}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <p className="mt-3 text-[11px] font-semibold text-slate-400">
+          Mostrando {filteredScores.length} de {localScores.length} estudiantes
+        </p>
+      </section>
+
       {/* Grade entry table */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm mb-6">
         <div className="overflow-x-auto">
@@ -507,12 +551,24 @@ export default function ActivityGrades() {
               {localScores.length === 0 && (
                 <tr>
                   <td colSpan="7" className="py-14 text-center text-slate-400 text-xs font-semibold">
-                    {period ? 'Cargando estudiantes...' : 'Esperando período activo...'}
+                    {isLoadingActivityGrades
+                      ? 'Cargando estudiantes...'
+                      : period
+                        ? 'No hay estudiantes activos en esta sección.'
+                        : 'Esperando período seleccionado...'}
                   </td>
                 </tr>
               )}
 
-              {localScores.map((student) => {
+              {localScores.length > 0 && filteredScores.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="py-14 text-center text-slate-400 text-xs font-semibold">
+                    No se encontraron estudiantes que coincidan con la búsqueda o el filtro.
+                  </td>
+                </tr>
+              )}
+
+              {filteredScores.map((student) => {
                 const rawTotal  = calcTotal(student.c1, student.c2, student.c3);
                 const totalDisp = rawTotal !== null ? rawTotal.toFixed(1) : '--';
                 const isRisk    = rawTotal !== null && rawTotal < 70;

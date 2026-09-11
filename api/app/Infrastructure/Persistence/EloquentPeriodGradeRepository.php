@@ -82,13 +82,60 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
     }
 
     /** Cambia estado de todas las notas de una asignatura/período a 'in_review'. */
-    public function submitForReview(int $subjectId, int $periodId, ?int $sectionId = null): void
+    public function submitForReview(int $subjectId, int $periodId, ?int $sectionId = null): int
     {
-        PeriodGradeModel::where('subject_id', $subjectId)
+        return PeriodGradeModel::where('subject_id', $subjectId)
             ->where('period_id', $periodId)
             ->when($sectionId, fn($query) => $query->where('section_id', $sectionId))
             ->where('status', 'draft')
             ->update(['status' => 'in_review']);
+    }
+
+    public function submissionReadiness(int $subjectId, int $periodId, int $sectionId): array
+    {
+        $students = StudentModel::query()
+            ->where('section_id', $sectionId)
+            ->where('active', true)
+            ->orderBy('last_name')
+            ->orderBy('name')
+            ->get(['id', 'name', 'last_name', 'enrollment_no']);
+
+        $grades = PeriodGradeModel::query()
+            ->where('section_id', $sectionId)
+            ->where('subject_id', $subjectId)
+            ->where('period_id', $periodId)
+            ->whereIn('student_id', $students->pluck('id'))
+            ->get()
+            ->keyBy('student_id');
+
+        $pending = $students
+            ->filter(function (StudentModel $student) use ($grades): bool {
+                $grade = $grades->get($student->id);
+
+                return ! $grade
+                    || $grade->status !== 'draft'
+                    || $grade->c1_score === null
+                    || $grade->c2_score === null
+                    || $grade->c3_score === null
+                    || $grade->period_score === null;
+            })
+            ->map(fn (StudentModel $student): array => [
+                'student_id' => (int) $student->id,
+                'student_name' => trim("{$student->last_name}, {$student->name}"),
+                'enrollment_no' => $student->enrollment_no,
+            ])
+            ->values();
+
+        $totalStudents = $students->count();
+        $pendingStudents = $pending->count();
+
+        return [
+            'total_students' => $totalStudents,
+            'complete_students' => $totalStudents - $pendingStudents,
+            'pending_students' => $pendingStudents,
+            'ready' => $totalStudents > 0 && $pendingStudents === 0,
+            'pending' => $pending->all(),
+        ];
     }
 
     /** Aprueba las notas de período, registrando quién y cuándo. */

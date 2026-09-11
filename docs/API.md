@@ -284,6 +284,8 @@ draft → in_review → official
 
 Las notas de una actividad desactivada se conservan como historial, pero no se muestran en el registro docente ni participan en C1, C2, C3, la nota del período o los indicadores de riesgo. Al reactivar la actividad, la API vuelve a incluirlas y recalcula los resúmenes afectados.
 
+El docente registra y guarda el progreso desde cada actividad. El envío a revisión es una acción única del workspace y no aparece dentro de una actividad individual. Solo se habilita cuando el período termina según su estado efectivo (el día posterior a `end_date`) y todos los estudiantes activos de la sección tienen C1, C2, C3 y nota del período completas. Una vez enviado, el workspace queda en `in_review` hasta que coordinación lo apruebe o lo rechace.
+
 ### Promoción
 
 - La promoción solo se habilita cuando los cuatro períodos del año están cerrados.
@@ -740,8 +742,8 @@ Los indicadores no mezclan secciones, otros profesores ni años históricos. Si 
 | `PATCH` | `/docente/activities/{id}` | Renombra o cambia el estado de una actividad autorizada. |
 | `GET` | `/docente/grades/activity/{activityId}/{periodId}` | Estudiantes y notas de una actividad. |
 | `POST` | `/docente/grades/activity-score` | Crea, actualiza o limpia una nota de actividad. |
-| `GET` | `/docente/grades/period/{subjectId}/{periodId}` | Libro del período; exige `section_id`. |
-| `POST` | `/docente/grades/submit` | Envía todas las notas del workspace a revisión. |
+| `GET` | `/docente/grades/period/{subjectId}/{periodId}` | Libro del período; exige `section_id` y devuelve `grades` junto con `submission` (resumen de estudiantes completos y pendientes). |
+| `POST` | `/docente/grades/submit` | Envía todas las notas completas del workspace a revisión; solo funciona después del período y si `submission.ready` es `true`. |
 | `POST` | `/docente/grades/recovery` | Registra RP, recuperación final o especial. |
 
 Crear actividad:
@@ -789,6 +791,8 @@ Enviar a revisión:
   "period_id": 9
 }
 ```
+
+El endpoint responde `423` mientras el período esté abierto o futuro, y `422` si faltan calificaciones de estudiantes activos. En ambos casos incluye `submission` para que el frontend pueda mostrar el motivo y la lista de pendientes. El envío exitoso devuelve `submitted_count` y cambia las filas de `draft` a `in_review`.
 
 Recuperación:
 

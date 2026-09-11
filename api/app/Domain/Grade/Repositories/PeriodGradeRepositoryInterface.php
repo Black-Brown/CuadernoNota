@@ -82,7 +82,21 @@ interface PeriodGradeRepositoryInterface
      * @param int $subjectId ID de la asignatura
      * @param int $periodId  ID del período académico
      */
-    public function submitForReview(int $subjectId, int $periodId, ?int $sectionId = null): void;
+    public function submitForReview(int $subjectId, int $periodId, ?int $sectionId = null): int;
+
+    /**
+     * Indica si todos los estudiantes activos de la sección tienen una nota
+     * completa y en borrador para poder enviar el curso a revisión.
+     *
+     * @return array{
+     *     total_students: int,
+     *     complete_students: int,
+     *     pending_students: int,
+     *     ready: bool,
+     *     pending: array<int, array{student_id: int, student_name: string, enrollment_no: string|null}>
+     * }
+     */
+    public function submissionReadiness(int $subjectId, int $periodId, int $sectionId): array;
 
     /**
      * Aprueba las notas de período, cambiando su estado a 'official'

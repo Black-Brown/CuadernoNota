@@ -12,8 +12,8 @@ class SubmitGrades
         private readonly PeriodGradeRepositoryInterface $periodGradeRepo,
     ) {}
 
-    public function execute(int $subjectId, int $periodId, ?int $sectionId = null): void
+    public function execute(int $subjectId, int $periodId, ?int $sectionId = null): int
     {
-        $this->periodGradeRepo->submitForReview($subjectId, $periodId, $sectionId);
+        return $this->periodGradeRepo->submitForReview($subjectId, $periodId, $sectionId);
     }
 }
