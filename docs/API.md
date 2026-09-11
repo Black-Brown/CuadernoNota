@@ -282,6 +282,8 @@ draft → in_review → official
           └─ rechazo ────┴─ reapertura → draft
 ```
 
+Las notas de una actividad desactivada se conservan como historial, pero no se muestran en el registro docente ni participan en C1, C2, C3, la nota del período o los indicadores de riesgo. Al reactivar la actividad, la API vuelve a incluirlas y recalcula los resúmenes afectados.
+
 ### Promoción
 
 - La promoción solo se habilita cuando los cuatro períodos del año están cerrados.
@@ -776,6 +778,8 @@ Registrar una nota:
 
 `score` acepta valores de 0 a 100 o `null` para dejar la actividad sin calificar. La API comprueba que actividad, estudiante, sección, materia y período formen el mismo workspace.
 
+No se pueden consultar ni registrar calificaciones de una actividad inactiva. Sus filas de notas se conservan y el resumen del período se recalcula automáticamente cuando cambia el estado de la actividad.
+
 Enviar a revisión:
 
 ```json
@@ -1111,4 +1115,3 @@ Las áreas de mayor riesgo que deben mantener cobertura son:
 - Variables de ejemplo: `api/.env.example`.
 - Importación CSV: [`docs/importacion-estudiantes.md`](./importacion-estudiantes.md).
 - Restablecimiento de datos: [`docs/SYSTEM_DATA_RESET.md`](./SYSTEM_DATA_RESET.md).
-

@@ -4,6 +4,7 @@ namespace App\Infrastructure\Http\Controllers\Docente;
 
 use App\Application\Activity\CreateActivity;
 use App\Application\Activity\ToggleActivity;
+use App\Application\Grade\RecalculateActivityPeriodGrades;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -16,6 +17,7 @@ class ActivityController extends Controller
     public function __construct(
         private readonly CreateActivity $createActivity,
         private readonly ToggleActivity $toggleActivity,
+        private readonly RecalculateActivityPeriodGrades $recalculateActivityPeriodGrades,
     ) {}
 
     public function store(Request $request): JsonResponse
@@ -139,7 +141,17 @@ class ActivityController extends Controller
             ], 403);
         }
 
-        $activity = $this->toggleActivity->execute($id);
+        $activity = DB::transaction(function () use ($id, $model): array {
+            $activity = $this->toggleActivity->execute($id);
+            $activity['recalculated_students'] = $this->recalculateActivityPeriodGrades->execute(
+                activityId: $id,
+                subjectId: (int) $model->subject_id,
+                periodId: (int) $model->period_id,
+                sectionId: (int) $model->section_id,
+            );
+
+            return $activity;
+        });
         $state    = $activity['active'] ? 'activada' : 'desactivada';
 
         return response()->json([

@@ -48,6 +48,14 @@ interface ActivityScoreRepositoryInterface
     ): array;
 
     /**
+     * Devuelve los estudiantes que tienen filas de notas preservadas para una actividad.
+     * Se usa para recalcular sus resúmenes al activar o desactivar la actividad.
+     *
+     * @return int[]
+     */
+    public function findStudentIdsByActivity(int $activityId): array;
+
+    /**
      * Devuelve TODOS los estudiantes de la sección correspondiente a una
      * actividad, con sus notas C1, C2 y C3 para esa actividad y período.
      * Los estudiantes sin nota registrada aparecen con null en cada campo.

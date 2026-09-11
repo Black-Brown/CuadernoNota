@@ -285,6 +285,7 @@ class RiskController extends Controller
             ->where('activity_scores.subject_id', $subjectId)
             ->where('activity_scores.period_id', $periodId)
             ->where('activities.section_id', $sectionId)
+            ->where('activities.active', true)
             ->select('activities.id', 'activities.name', 'competencies.code', 'activity_scores.score')
             ->orderBy('activities.name')
             ->get();
@@ -351,6 +352,7 @@ class RiskController extends Controller
             ->where('activity_scores.subject_id', $subjectId)
             ->where('activity_scores.period_id', $periodId)
             ->where('competencies.code', $competencyCode)
+            ->where('activities.active', true)
             ->whereNotNull('activity_scores.score')
             ->select('activities.name', 'activity_scores.score')
             ->orderBy('activity_scores.score')

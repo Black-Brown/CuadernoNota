@@ -60,10 +60,10 @@ export default function ActivityGrades() {
   const lockedGradeStatus = periodLockData?.grades?.find((grade) =>
     ['in_review', 'official'].includes(grade.status)
   )?.status;
-  const canEditGrades = isPeriodOpen && !lockedGradeStatus;
+  const canEditPeriodGrades = isPeriodOpen && !lockedGradeStatus;
 
   // Resolve real activity name from the subject's activity list
-  const { data: activitiesData } = useQuery({
+  const { data: activitiesData, isLoading: isLoadingActivities } = useQuery({
     queryKey: ['activitiesBySubject', subjectId, sectionId, period?.id],
     queryFn:  () => getActivitiesBySubject(subjectId, sectionId, period.id),
     enabled:  !!subjectId && !!sectionId && !!period?.id,
@@ -73,12 +73,13 @@ export default function ActivityGrades() {
     (a) => String(a.id) === String(activityId)
   );
   const activityName = currentActivity?.name ?? 'Actividad';
+  const canEditGrades = canEditPeriodGrades && currentActivity?.active === true;
 
   // Fetch grades — pass sectionId so backend returns the correct section's students
   const { data: activityGradesData } = useQuery({
     queryKey: ['activityGrades', activityId, period?.id, sectionId],
     queryFn:  () => getActivityGrades(activityId, period.id, sectionId),
-    enabled:  !!activityId && !!period?.id && !!sectionId && !!currentActivity,
+    enabled:  !!activityId && !!period?.id && !!sectionId && currentActivity?.active === true,
   });
 
   useEffect(() => {
@@ -319,6 +320,42 @@ export default function ActivityGrades() {
     { label: '95-100', color: 'bg-indigo-500/50',  count: numericTotals.filter(t => t >= 95).length,              hover: 'Sobresaliente' },
   ];
   const distMax = Math.max(...distBuckets.map(b => b.count), 1);
+
+  if (!isLoadingActivities && currentActivity && !currentActivity.active) {
+    return (
+      <DashboardLayout>
+        <div className="mb-6 space-y-1.5">
+          <nav className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <Link to="/docente/courses" className="transition-colors hover:text-slate-700">Mis Cursos</Link>
+            <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+            <Link to={`/docente/courses/${sectionId}/${subjectId}`} className="transition-colors hover:text-slate-700">
+              {gradeName} {sectionName}
+            </Link>
+            <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+            <span className="text-slate-500">{subjectName}</span>
+          </nav>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-800">{activityName}</h2>
+        </div>
+
+        <section className="rounded-2xl border border-amber-200 bg-white px-6 py-14 text-center shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+            <span className="material-symbols-outlined text-[30px]">visibility_off</span>
+          </div>
+          <h3 className="mt-5 text-lg font-extrabold text-slate-900">Actividad desactivada</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
+            Sus calificaciones están conservadas, pero no se muestran ni se incluyen en el promedio mientras la actividad permanezca inactiva.
+          </p>
+          <Link
+            to={`/docente/courses/${sectionId}/${subjectId}`}
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-xs font-extrabold text-white transition-colors hover:bg-slate-800"
+          >
+            Volver al workspace
+            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+          </Link>
+        </section>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

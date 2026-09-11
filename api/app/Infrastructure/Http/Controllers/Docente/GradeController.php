@@ -94,6 +94,12 @@ class GradeController extends Controller
             return response()->json(['message' => 'La actividad no pertenece al período seleccionado.'], 422);
         }
 
+        if (! (bool) $activity->active) {
+            return response()->json([
+                'message' => 'La actividad está inactiva y sus calificaciones no están disponibles.',
+            ], 422);
+        }
+
         $sectionId = request()->integer('section_id') ?: (int) $activity->section_id;
 
         if (
@@ -278,6 +284,12 @@ class GradeController extends Controller
         ) {
             return response()->json([
                 'message' => 'La actividad no pertenece al curso o período seleccionado.',
+            ], 422);
+        }
+
+        if (! (bool) $activity->active) {
+            return response()->json([
+                'message' => 'No se pueden registrar notas en una actividad inactiva.',
             ], 422);
         }
 

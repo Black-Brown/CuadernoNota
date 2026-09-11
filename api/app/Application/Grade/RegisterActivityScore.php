@@ -6,9 +6,6 @@ namespace App\Application\Grade;
 
 use App\Domain\Grade\Entities\PeriodGrade;
 use App\Domain\Grade\Repositories\ActivityScoreRepositoryInterface;
-use App\Domain\Grade\Repositories\PeriodGradeRepositoryInterface;
-use App\Domain\Grade\Services\CompetencyCalculator;
-use App\Domain\Grade\Services\GradeCalculator;
 
 /**
  * Caso de uso: Registrar la nota de una actividad para un estudiante.
@@ -31,15 +28,11 @@ class RegisterActivityScore
 {
     /**
      * @param ActivityScoreRepositoryInterface $activityScoreRepo Repositorio de notas de actividades
-     * @param PeriodGradeRepositoryInterface   $periodGradeRepo   Repositorio de notas por período
-     * @param CompetencyCalculator             $competencyCalc    Servicio del Paso 1
-     * @param GradeCalculator                  $gradeCalc         Servicio del Paso 2
+     * @param RecalculatePeriodGrade           $recalculatePeriodGrade Recalcula el resumen del período
      */
     public function __construct(
         private readonly ActivityScoreRepositoryInterface $activityScoreRepo,
-        private readonly PeriodGradeRepositoryInterface   $periodGradeRepo,
-        private readonly CompetencyCalculator              $competencyCalc,
-        private readonly GradeCalculator                   $gradeCalc,
+        private readonly RecalculatePeriodGrade $recalculatePeriodGrade,
     ) {}
 
     /**
@@ -62,52 +55,11 @@ class RegisterActivityScore
         // Paso 1a: guardar la nota
         $this->activityScoreRepo->save($scoreData);
 
-        // Paso 1b: recuperar todas las notas del período para recalcular
-        $allScores = $this->activityScoreRepo->findByStudentSubjectPeriod(
-            $scoreData['student_id'],
-            $scoreData['subject_id'],
-            $scoreData['period_id'],
+        return $this->recalculatePeriodGrade->execute(
+            studentId: (int) $scoreData['student_id'],
+            subjectId: (int) $scoreData['subject_id'],
+            periodId: (int) $scoreData['period_id'],
+            sectionId: isset($scoreData['section_id']) ? (int) $scoreData['section_id'] : null,
         );
-
-        // Paso 1 — Calcular nota de cada competencia
-        $c1 = $this->competencyCalc->calculate($allScores, 1);
-        $c2 = $this->competencyCalc->calculate($allScores, 2);
-        $c3 = $this->competencyCalc->calculate($allScores, 3);
-
-        // Si alguna competencia queda sin notas, el cálculo anterior deja de ser válido.
-        if ($c1 === null || $c2 === null || $c3 === null) {
-            $this->periodGradeRepo->deleteByStudentSubjectPeriod(
-                $scoreData['student_id'],
-                $scoreData['subject_id'],
-                $scoreData['period_id'],
-            );
-
-            return null;
-        }
-
-        // Paso 2 — Calcular nota del período
-        $periodScore = $this->gradeCalc->calculate($c1, $c2, $c3);
-
-        // Recuperar el PeriodGrade existente para preservar rpScore y status
-        $existing = $this->periodGradeRepo->findByStudentSubjectPeriod(
-            $scoreData['student_id'],
-            $scoreData['subject_id'],
-            $scoreData['period_id'],
-        );
-
-        $periodGrade = new PeriodGrade(
-            studentId:   $scoreData['student_id'],
-            subjectId:   $scoreData['subject_id'],
-            periodId:    $scoreData['period_id'],
-            c1Score:     $c1,
-            c2Score:     $c2,
-            c3Score:     $c3,
-            periodScore: $periodScore,
-            rpScore:     $existing?->rpScore,
-            status:      $existing?->status ?? 'draft',
-            sectionId:   isset($scoreData['section_id']) ? (int) $scoreData['section_id'] : $existing?->sectionId,
-        );
-
-        return $this->periodGradeRepo->upsert($periodGrade);
     }
 }

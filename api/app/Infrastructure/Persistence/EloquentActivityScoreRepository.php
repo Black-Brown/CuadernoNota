@@ -20,6 +20,10 @@ class EloquentActivityScoreRepository implements ActivityScoreRepositoryInterfac
     {
         $activity = ActivityModel::findOrFail($data['activity_id']);
 
+        if (! $activity->active) {
+            throw new \InvalidArgumentException('No se pueden registrar notas en una actividad inactiva.');
+        }
+
         if ($activity->period_id !== null && (int) $activity->period_id !== (int) $data['period_id']) {
             throw new \InvalidArgumentException('La actividad no pertenece al período seleccionado.');
         }
@@ -49,6 +53,7 @@ class EloquentActivityScoreRepository implements ActivityScoreRepositoryInterfac
         return ActivityScoreModel::where('student_id', $studentId)
             ->where('subject_id', $subjectId)
             ->where('period_id', $periodId)
+            ->whereHas('activity', fn ($query) => $query->where('status', 'active'))
             ->get(['competency_id', 'score'])
             ->map(fn($m) => [
                 'competency_id' => (int) $m->competency_id,
@@ -57,9 +62,22 @@ class EloquentActivityScoreRepository implements ActivityScoreRepositoryInterfac
             ->all();
     }
 
+    public function findStudentIdsByActivity(int $activityId): array
+    {
+        return ActivityScoreModel::where('activity_id', $activityId)
+            ->distinct()
+            ->pluck('student_id')
+            ->map(fn ($studentId) => (int) $studentId)
+            ->all();
+    }
+
     public function findStudentScoresByActivity(int $activityId, int $periodId, ?int $sectionId = null): array
     {
         $activity = ActivityModel::findOrFail($activityId);
+
+        if (! $activity->active) {
+            return [];
+        }
 
         if ($activity->period_id !== null && (int) $activity->period_id !== (int) $periodId) {
             return [];
