@@ -22,7 +22,6 @@ const EMPTY_FORM = {
   period_id:   '',
   status:      'active',
   due_date:    '',
-  weight:      '',
 };
 
 export default function ManageActivitiesModal({ subjectId, sectionId, periodId, periodName, periodStatus, lockedGradeStatus, onClose }) {
@@ -142,7 +141,6 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
       period_id:   Number(periodId),
       status:      form.status || 'active',
       due_date:    form.due_date || null,
-      weight:      form.weight !== '' ? Number(form.weight) : null,
       icon:        'add_task',
     });
   };
@@ -459,42 +457,18 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
                 </div>
               </div>
 
-              {/* Due date + Weight */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] uppercase tracking-wide font-semibold text-slate-500">
-                    Fecha límite
-                  </label>
-                  <input
-                    type="date"
-                    value={form.due_date}
-                    onChange={(e) => handleFormChange('due_date', e.target.value)}
-                    disabled={!canEditActivities}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[11px] uppercase tracking-wide font-semibold text-slate-500">
-                    Ponderación
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      placeholder="Ej. 100"
-                      value={form.weight}
-                      onChange={(e) => handleFormChange('weight', e.target.value)}
-                      disabled={!canEditActivities}
-                      className="w-full px-4 py-2.5 pr-9 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-semibold pointer-events-none">
-                      %
-                    </span>
-                  </div>
-                </div>
+              {/* Due date */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] uppercase tracking-wide font-semibold text-slate-500">
+                  Fecha límite
+                </label>
+                <input
+                  type="date"
+                  value={form.due_date}
+                  onChange={(e) => handleFormChange('due_date', e.target.value)}
+                  disabled={!canEditActivities}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
+                />
               </div>
 
               {/* Icon preview */}
