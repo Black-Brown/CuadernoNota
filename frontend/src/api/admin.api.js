@@ -117,3 +117,7 @@ export async function downloadBackup() {
   link.remove();
   window.URL.revokeObjectURL(url);
 }
+export const getAttendanceCourses = (params = {}) => api.get('/admin/reports/attendance/courses', { params }).then(r => r.data);
+export const getAttendanceRecords = (sectionId, params = {}) => api.get(`/admin/reports/attendance/courses/${sectionId}`, { params }).then(r => r.data);
+export const getAcademicCourses = (params = {}) => api.get('/admin/reports/academic/courses', { params }).then(r => r.data);
+export const getAcademicRecords = (sectionId, params = {}) => api.get(`/admin/reports/academic/courses/${sectionId}`, { params }).then(r => r.data);

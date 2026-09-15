@@ -5,6 +5,8 @@ import { downloadCsv, safeFilename } from '../../utils/exportCsv';
 import PageHeader from '../../components/ui/PageHeader';
 import KpiCard from '../../components/ui/KpiCard';
 import DataTable from '../../components/ui/DataTable';
+import AttendanceReportWorkspace from './AttendanceReportWorkspace';
+import AcademicReportWorkspace from './AcademicReportWorkspace';
 import { selectClass } from '../../components/ui/FormField';
 
 const TABS = [
@@ -71,6 +73,8 @@ export default function Reports() {
 
       {tab === 'academic' ? (
         <>
+          <AcademicReportWorkspace key={yearId} yearId={yearId} yearName={yearName} />
+          <h2 className="mb-4 text-lg font-extrabold">Resumen del año escolar</h2>
           <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
             <KpiCard label="Estudiantes evaluados" value={evaluatedStudents} icon="groups" tone="bg-sky-50 text-sky-700" loading={academic.isLoading} />
             <KpiCard label="Promedio general" value={academicAvg} icon="analytics" tone="bg-emerald-50 text-emerald-700" loading={academic.isLoading} />
@@ -110,18 +114,20 @@ export default function Reports() {
         </>
       ) : (
         <>
+          <AttendanceReportWorkspace key={yearId} yearId={yearId} yearName={yearName} />
+          <h2 className="mb-4 text-lg font-extrabold">Resumen del año escolar</h2>
           <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
             <KpiCard label="Registros" value={attendanceTotals.records} icon="fact_check" tone="bg-indigo-50 text-indigo-700" loading={attendance.isLoading} />
             <KpiCard label="Asistieron (P + T)" value={attendanceTotals.present} icon="check_circle" tone="bg-emerald-50 text-emerald-700" loading={attendance.isLoading} />
             <KpiCard label="Ausentes" value={attendanceTotals.absent} icon="cancel" tone="bg-red-50 text-red-700" loading={attendance.isLoading} />
-            <KpiCard label="Tasa de asistencia" value={`${attendanceRate}%`} icon="trending_up" tone="bg-sky-50 text-sky-700" loading={attendance.isLoading} />
+            <KpiCard label="Tasa de asistencia" value={attendanceTotals.records ? `${attendanceRate}%` : '—'} icon="trending_up" tone="bg-sky-50 text-sky-700" loading={attendance.isLoading} />
           </section>
 
           <div className="mb-3 flex justify-end">
             <button
               onClick={() => downloadCsv(`reporte-asistencia-${safeFilename(yearName)}`, [
-                ['Grado', 'Sección', 'Materia', 'Registros', 'Asistieron (P + T)', 'Ausentes', 'Tardanzas', 'Excusas'],
-                ...attendanceRows.map((r) => [r.grade, r.section, r.subject, r.records, r.present, r.absent, r.late, r.excused]),
+                ['Grado', 'Sección', 'Tanda', 'Materia', 'Registros', 'Asistieron (P + T)', 'Ausentes', 'Tardanzas', 'Excusas'],
+                ...attendanceRows.map((r) => [r.grade, r.section, r.shift, r.subject, r.records, r.present, r.absent, r.late, r.excused]),
               ])}
               disabled={attendanceRows.length === 0}
               className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
@@ -141,6 +147,7 @@ export default function Reports() {
               { key: 'grade', label: 'Grado' },
               { key: 'section', label: 'Sección' },
               { key: 'subject', label: 'Materia' },
+              { key: 'shift', label: 'Tanda' },
               { key: 'records', label: 'Registros', align: 'center' },
               { key: 'present', label: 'Asistieron', align: 'center' },
               { key: 'absent', label: 'Ausentes', align: 'center' },

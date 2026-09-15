@@ -74,6 +74,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
             Route::get('/reports/academic', [ReportController::class, 'academic'])->name('reports.academic');
             Route::get('/reports/attendance', [ReportController::class, 'attendance'])->name('reports.attendance');
+            Route::get('/reports/attendance/courses', [ReportController::class, 'attendanceCourses'])->name('reports.attendance.courses');
+            Route::get('/reports/academic/courses', [ReportController::class, 'attendanceCourses'])->name('reports.academic.courses');
+            Route::get('/reports/academic/courses/{sectionId}', [ReportController::class, 'academicRecords'])->whereNumber('sectionId')->name('reports.academic.records');
+            Route::get('/reports/attendance/courses/{sectionId}', [ReportController::class, 'attendanceRecords'])->whereNumber('sectionId')->name('reports.attendance.records');
             Route::get('/audit-logs', [ReportController::class, 'audits'])->name('audit-logs.index');
             Route::post('/backups', [ReportController::class, 'backup'])->name('backups.store');
 
