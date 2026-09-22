@@ -1,4 +1,17 @@
 .env
+.env.*
+!.env.example
 .git
 storage/logs/*
+storage/app/private/*
+storage/app/public/*
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+!storage/**/.gitignore
+bootstrap/cache/*.php
+database/*.sqlite*
+auth.json
+.vercel
+tests
 vendor
