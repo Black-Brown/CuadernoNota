@@ -1,0 +1,32 @@
+FROM php:8.4-fpm-bookworm
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gettext-base libicu-dev libpq-dev libzip-dev nginx supervisor unzip \
+    && docker-php-ext-install intl opcache pcntl pdo_pgsql zip \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+WORKDIR /var/www/html
+COPY composer.json composer.lock ./
+RUN --mount=type=cache,target=/tmp/composer-cache \
+    COMPOSER_CACHE_DIR=/tmp/composer-cache COMPOSER_MAX_PARALLEL_HTTP=4 \
+    composer install --classmap-authoritative --no-dev --no-interaction --no-progress --no-scripts --prefer-dist
+COPY . .
+RUN cp docker/php-fpm.conf /usr/local/etc/php-fpm.d/zz-app.conf \
+    && cp docker/opcache.ini /usr/local/etc/php/conf.d/zz-opcache.ini \
+    && cp docker/uploads.ini /usr/local/etc/php/conf.d/zz-uploads.ini \
+    && composer dump-autoload --classmap-authoritative --no-dev \
+    && sed -i 's/\r$//' docker/vercel/entrypoint.sh \
+    && chmod +x docker/vercel/entrypoint.sh
+
+ENV APP_ENV=production APP_DEBUG=false PORT=80 \
+    LOG_CHANNEL=stderr LOG_LEVEL=warning \
+    DB_CONNECTION=pgsql DB_SSLMODE=require \
+    CACHE_STORE=database SESSION_DRIVER=database QUEUE_CONNECTION=sync \
+    LARAVEL_STORAGE_PATH=/tmp/laravel-storage \
+    APP_CONFIG_CACHE=/tmp/laravel-config.php \
+    APP_SERVICES_CACHE=/tmp/laravel-services.php
+
+EXPOSE 80
+ENTRYPOINT ["docker/vercel/entrypoint.sh"]
+CMD ["/usr/bin/supervisord", "-n", "-c", "/var/www/html/docker/vercel/supervisord.conf"]
