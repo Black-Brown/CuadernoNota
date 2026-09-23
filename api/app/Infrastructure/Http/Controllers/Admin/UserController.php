@@ -76,7 +76,7 @@ class UserController extends Controller
             'name' => [$sometimes, 'string', 'max:255'],
             'email' => [$sometimes, 'email', 'max:255', Rule::unique('users')->ignore($user?->id)],
             'password' => ['nullable', 'string', 'min:8'],
-            'role' => [$sometimes, Rule::in($user?->role === 'coordinator' ? ['teacher', 'coordinator', 'admin'] : ['teacher', 'admin'])],
+            'role' => [$sometimes, Rule::in(['teacher', 'coordinator', 'admin'])],
             'active' => ['sometimes', 'boolean'],
         ];
     }

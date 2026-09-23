@@ -11,9 +11,21 @@ use Illuminate\Validation\ValidationException;
 
 class GradeReviewController extends Controller
 {
+    protected function scopeReviews($query)
+    {
+        return $query;
+    }
+
+    protected function authorizeWorkspace(int $sectionId, int $subjectId, int $periodId): void {}
+
+    protected function allowedActions(): array
+    {
+        return ['approved', 'rejected', 'reopened'];
+    }
+
     public function index(Request $request): JsonResponse
     {
-        $rows = DB::table('period_grades')
+        $rows = $this->scopeReviews(DB::table('period_grades'))
             ->join('students', 'period_grades.student_id', '=', 'students.id')
             ->join('sections', 'period_grades.section_id', '=', 'sections.id')
             ->join('grades', 'sections.grade_id', '=', 'grades.id')
@@ -31,6 +43,7 @@ class GradeReviewController extends Controller
 
     public function show(int $sectionId, int $subjectId, int $periodId): JsonResponse
     {
+        $this->authorizeWorkspace($sectionId, $subjectId, $periodId);
         return response()->json(DB::table('period_grades')->join('students', 'period_grades.student_id', '=', 'students.id')
             ->where('period_grades.section_id', $sectionId)->where('period_grades.subject_id', $subjectId)->where('period_grades.period_id', $periodId)
             ->select('period_grades.*', 'students.name', 'students.last_name', 'students.enrollment_no')->orderBy('students.last_name')->get());
@@ -40,9 +53,10 @@ class GradeReviewController extends Controller
     {
         $data = $request->validate([
             'section_id' => ['required', 'exists:sections,id'], 'subject_id' => ['required', 'exists:subjects,id'], 'period_id' => ['required', 'exists:periods,id'],
-            'action' => ['required', Rule::in(['approved', 'rejected', 'reopened'])], 'comment' => ['nullable', 'string', 'max:2000', 'required_if:action,rejected,reopened'],
+            'action' => ['required', Rule::in($this->allowedActions())], 'comment' => ['nullable', 'string', 'max:2000', 'required_if:action,rejected,reopened'],
         ]);
         $updated = DB::transaction(function () use ($data, $request) {
+            $this->authorizeWorkspace((int) $data['section_id'], (int) $data['subject_id'], (int) $data['period_id']);
             $query = DB::table('period_grades')->where('subject_id', $data['subject_id'])->where('period_id', $data['period_id'])
                 ->where('section_id', $data['section_id']);
             $expected = $data['action'] === 'reopened' ? 'official' : 'in_review';

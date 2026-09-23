@@ -162,7 +162,7 @@ class AdminApiTest extends TestCase
             'name' => 'Coordinador sin portal',
             'email' => 'coordinacion@happylearningschool.net',
             'role' => 'coordinator',
-        ])->assertUnprocessable()->assertJsonValidationErrors('role');
+        ])->assertCreated()->assertJsonPath('role', 'coordinator');
     }
 
     public function test_sections_cannot_be_duplicated_in_the_same_year_grade_and_shift(): void

@@ -18,25 +18,33 @@ function scoreClass(value) {
   return Number(value) < 70 ? 'font-bold text-red-600' : 'font-semibold text-slate-800';
 }
 
-export default function GradeReviewDetail() {
+export default function GradeReviewDetail({
+  loadDetail = getGradeReviewDetail,
+  saveDecision = decideGradeReview,
+  queryPrefix = 'admin',
+  portalName = 'Portal Administrativo',
+  reviewsPath = '/admin/reviews',
+  canReopen = true,
+} = {}) {
   const { sectionId, subjectId, periodId } = useParams();
   const qc = useQueryClient();
   const { toast, showToast } = useToast();
   const [pendingAction, setPendingAction] = useState(null);
   const [comment, setComment] = useState('');
 
-  const queryKey = ['admin-grade-review-detail', sectionId, subjectId, periodId];
-  const { data, isLoading } = useQuery({ queryKey, queryFn: () => getGradeReviewDetail(sectionId, subjectId, periodId) });
+  const queryKey = [`${queryPrefix}-grade-review-detail`, sectionId, subjectId, periodId];
+  const { data, isLoading, isError } = useQuery({ queryKey, queryFn: () => loadDetail(sectionId, subjectId, periodId) });
 
   const status = data?.[0]?.status;
   const meta = STATUS_META[status] || STATUS_META.draft;
   const requiresComment = pendingAction === 'rejected' || pendingAction === 'reopened';
 
   const decideMutation = useMutation({
-    mutationFn: () => decideGradeReview({ section_id: Number(sectionId), subject_id: Number(subjectId), period_id: Number(periodId), action: pendingAction, comment: comment || undefined }),
+    mutationFn: () => saveDecision({ section_id: Number(sectionId), subject_id: Number(subjectId), period_id: Number(periodId), action: pendingAction, comment: comment || undefined }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey });
-      qc.invalidateQueries({ queryKey: ['admin-grade-reviews'] });
+      qc.invalidateQueries({ queryKey: [`${queryPrefix}-grade-reviews`] });
+      qc.invalidateQueries({ queryKey: [`${queryPrefix}-dashboard`] });
       setPendingAction(null);
       setComment('');
       showToast('Decisión aplicada correctamente.');
@@ -47,7 +55,7 @@ export default function GradeReviewDetail() {
   return (
     <>
       <PageHeader
-        breadcrumb={['Portal Administrativo', { label: 'Aprobación de notas', to: '/admin/reviews' }, 'Detalle']}
+        breadcrumb={[portalName, { label: 'Aprobación de notas', to: reviewsPath }, 'Detalle']}
         title="Detalle de calificaciones"
         description="Calificaciones por período para la sección y materia seleccionadas."
         actions={
@@ -59,13 +67,14 @@ export default function GradeReviewDetail() {
                 <button onClick={() => { setPendingAction('approved'); setComment(''); }} className="rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700">Aprobar</button>
               </>
             )}
-            {status === 'official' && (
+            {canReopen && status === 'official' && (
               <button onClick={() => { setPendingAction('reopened'); setComment(''); }} className="rounded-lg border border-amber-200 px-4 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-50">Reabrir</button>
             )}
           </div>
         }
       />
 
+      {isError && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">No se pudo cargar el detalle de calificaciones. Intenta nuevamente.</p>}
       <DataTable
         loading={isLoading}
         rows={data}

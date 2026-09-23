@@ -30,6 +30,13 @@ import AdminStudentPlacements from './pages/admin/StudentPlacements.jsx';
 import AdminReports from './pages/admin/Reports.jsx';
 import AdminAudit from './pages/admin/Audit.jsx';
 import AdminSystem from './pages/admin/System.jsx';
+import CoordinatorLayout from './components/CoordinatorLayout.jsx';
+import CoordinatorManagement from './pages/coordinador/Management.jsx';
+import CoordinatorDashboard from './pages/coordinador/Dashboard.jsx';
+import CoordinatorStudentWorkspace from './pages/coordinador/StudentWorkspace.jsx';
+import { getCoordinatorReviews, getCoordinatorReviewDetail, decideCoordinatorReview } from './api/coordinator.api';
+
+const coordinatorReviewProps = { queryPrefix: 'coordinator', portalName: 'Portal de Coordinación', reviewsPath: '/coordinador/reviews', canReopen: false };
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,8 +56,17 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route
             path="/modulo-coordinador-proximamente"
-            element={<ProtectedRoute allowedRoles={['coordinator']}><ModuleComingSoon title="Portal de coordinación próximamente" icon="admin_panel_settings" description="Tu cuenta está activa, pero el módulo de coordinación todavía no forma parte de esta beta." /></ProtectedRoute>}
+            element={<ProtectedRoute allowedRoles={['coordinator']}><Navigate to="/coordinador/dashboard" replace /></ProtectedRoute>}
           />
+
+          <Route path="/coordinador" element={<ProtectedRoute allowedRoles={['coordinator']}><CoordinatorLayout /></ProtectedRoute>}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<CoordinatorDashboard />} />
+            {['students', 'catalog', 'institutional', 'assignments', 'reports', 'promotions', 'student-placements'].map(mode => <Route key={mode} path={mode} element={<CoordinatorManagement key={mode} mode={mode} />} />)}
+            <Route path="sections/:sectionId" element={<CoordinatorStudentWorkspace />} />
+            <Route path="reviews" element={<AdminGradeReviews {...coordinatorReviewProps} loadReviews={getCoordinatorReviews} />} />
+            <Route path="reviews/:sectionId/:subjectId/:periodId" element={<AdminGradeReviewDetail {...coordinatorReviewProps} loadDetail={getCoordinatorReviewDetail} saveDecision={decideCoordinatorReview} />} />
+          </Route>
 
           <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminLayout /></ProtectedRoute>}>
             <Route index element={<Navigate to="dashboard" replace />} />

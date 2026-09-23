@@ -14,19 +14,25 @@ const STATUS_OPTIONS = [
   { value: 'draft', label: 'Borrador', tone: 'neutral' },
 ];
 
-export default function GradeReviews() {
+export default function GradeReviews({
+  loadReviews = getGradeReviews,
+  queryPrefix = 'admin',
+  portalName = 'Portal Administrativo',
+  reviewsPath = '/admin/reviews',
+  canReopen = true,
+} = {}) {
   const navigate = useNavigate();
   const [status, setStatus] = useState('in_review');
 
-  const { data, isLoading } = useQuery({ queryKey: ['admin-grade-reviews', status], queryFn: () => getGradeReviews({ status }) });
+  const { data, isLoading, isError } = useQuery({ queryKey: [`${queryPrefix}-grade-reviews`, status], queryFn: () => loadReviews({ status }) });
   const tone = STATUS_OPTIONS.find((s) => s.value === status)?.tone || 'neutral';
 
   return (
     <>
       <PageHeader
-        breadcrumb={['Portal Administrativo', 'Aprobación de notas']}
+        breadcrumb={[portalName, 'Aprobación de notas']}
         title="Aprobación de calificaciones"
-        description="Revisa, aprueba, rechaza o reabre calificaciones por sección, materia y período."
+        description={canReopen ? 'Revisa, aprueba, rechaza o reabre calificaciones por sección, materia y período.' : 'Consulta, aprueba o devuelve calificaciones con comentarios por sección, materia y período.'}
       />
 
       <FilterBar>
@@ -35,12 +41,14 @@ export default function GradeReviews() {
         </select>
       </FilterBar>
 
+      {isError && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">No se pudieron cargar las calificaciones. Intenta nuevamente.</p>}
       <DataTable
         loading={isLoading}
         rows={data}
+        rowKey={(row) => `${row.section_id}-${row.subject_id}-${row.period_id}`}
         emptyIcon="fact_check"
         emptyTitle="No hay calificaciones en este estado."
-        onRowClick={(row) => navigate(`/admin/reviews/${row.section_id}/${row.subject_id}/${row.period_id}`)}
+        onRowClick={(row) => navigate(`${reviewsPath}/${row.section_id}/${row.subject_id}/${row.period_id}`)}
         columns={[
           { key: 'grade_name', label: 'Grado' },
           { key: 'section_name', label: 'Sección' },

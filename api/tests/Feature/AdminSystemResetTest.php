@@ -289,6 +289,8 @@ class AdminSystemResetTest extends TestCase
             CourseOffering::create(['section_id' => $id, 'subject_id' => 1, 'active' => true]);
         }
         DB::table('teacher_assignments')->insert(['teacher_id' => $teacher->id, 'course_offering_id' => 1, 'assigned_by' => $admin->id]);
+        // A historical assignment may remain after a coordinator changes role.
+        DB::table('coordinator_sections')->insert(['user_id' => $admin->id, 'section_id' => 1]);
         DB::table('students')->insert(['id' => 1, 'name' => 'Ana', 'last_name' => 'Prueba', 'enrollment_no' => 'RESET-1', 'section_id' => 1, 'academic_year_id' => 1]);
         DB::table('student_enrollments')->insert(['id' => 1, 'student_id' => 1, 'section_id' => 1, 'enrolled_at' => '2026-08-01', 'created_by' => $admin->id]);
         DB::table('activity_scores')->insert(['activity_id' => DB::table('course_activities')->value('id'), 'student_id' => 1, 'competency_id' => 1, 'period_id' => 1, 'subject_id' => 1, 'score' => 85]);

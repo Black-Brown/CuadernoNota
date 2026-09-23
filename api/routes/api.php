@@ -34,6 +34,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
 
+    Route::middleware(['role:coordinator', 'audit.admin'])->prefix('coordinador')->group(function () {
+        Route::patch('/students/{studentId}', [\App\Infrastructure\Http\Controllers\Coordinador\AcademicManagementController::class, 'updateStudent'])->whereNumber('studentId');
+        Route::get('/catalog', [\App\Infrastructure\Http\Controllers\Coordinador\AcademicManagementController::class, 'catalog']);
+        Route::get('/promotions/{sectionId}', [\App\Infrastructure\Http\Controllers\Coordinador\AcademicManagementController::class, 'promotions'])->whereNumber('sectionId');
+        Route::get('/student-placements', [\App\Infrastructure\Http\Controllers\Coordinador\AcademicManagementController::class, 'placements']);
+        Route::get('/students', [\App\Infrastructure\Http\Controllers\Coordinador\AcademicManagementController::class, 'students']);
+        Route::get('/assignments', [\App\Infrastructure\Http\Controllers\Coordinador\AcademicManagementController::class, 'assignments']);
+        Route::get('/reports/{sectionId}', [\App\Infrastructure\Http\Controllers\Coordinador\AcademicManagementController::class, 'reports'])->whereNumber('sectionId');
+        Route::get('/dashboard', \App\Infrastructure\Http\Controllers\Coordinador\DashboardController::class);
+        Route::get('/sections/{sectionId}/students', [\App\Infrastructure\Http\Controllers\Coordinador\StudentWorkspaceController::class, 'show']);
+        Route::get('/sections/{sectionId}/students/{studentId}', [\App\Infrastructure\Http\Controllers\Coordinador\StudentWorkspaceController::class, 'student']);
+        Route::get('/grade-reviews', [\App\Infrastructure\Http\Controllers\Coordinador\GradeReviewController::class, 'index']);
+        Route::get('/grade-reviews/{sectionId}/{subjectId}/{periodId}', [\App\Infrastructure\Http\Controllers\Coordinador\GradeReviewController::class, 'show']);
+        Route::post('/grade-reviews/decision', [\App\Infrastructure\Http\Controllers\Coordinador\GradeReviewController::class, 'decide']);
+    });
+
     // ── Módulo Administrativo ─────────────────────────────────────────────────
     Route::middleware(['role:admin', 'audit.admin'])
         ->prefix('admin')
@@ -44,6 +60,8 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/system/reset-data', [SystemDataController::class, 'reset'])->name('system.reset-data');
 
             Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+            Route::get('/users/{user}/coordinator-sections', [\App\Infrastructure\Http\Controllers\Admin\CoordinatorAssignmentController::class, 'show']);
+            Route::put('/users/{user}/coordinator-sections', [\App\Infrastructure\Http\Controllers\Admin\CoordinatorAssignmentController::class, 'update']);
             Route::post('/users', [AdminUserController::class, 'store'])->name('users.store');
             Route::patch('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
             Route::delete('/users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');

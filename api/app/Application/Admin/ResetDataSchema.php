@@ -15,6 +15,7 @@ class ResetDataSchema
         'attendances' => 'Asistencias',
         'course_activities' => 'Actividades de cursos',
         'course_offerings' => 'Cursos',
+        'coordinator_sections' => 'Secciones asignadas a coordinadores',
         'final_grades' => 'Calificaciones finales',
         'grade_review_actions' => 'Historial de revisión de notas',
         'grade_subjects' => 'Relaciones grado–materia',
