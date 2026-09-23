@@ -9,11 +9,11 @@ import {
 test('cada rol entra en una ruta existente o informativa', () => {
   assert.equal(routeForRole('admin'), '/admin/dashboard');
   assert.equal(routeForRole('teacher'), '/docente/dashboard');
-  assert.equal(routeForRole('coordinator'), '/modulo-coordinador-proximamente');
+  assert.equal(routeForRole('coordinator'), '/coordinador/dashboard');
   assert.equal(routeForRole('unknown'), '/login');
 });
 
-test('la beta solo permite crear docentes y administradores', () => {
-  assert.deepEqual(Object.keys(ADMIN_CREATABLE_ROLES), ['teacher', 'admin']);
-  assert.equal(ROLE_LABELS.coordinator, 'Coordinador · Próximamente');
+test('permite crear cuentas de los tres portales disponibles', () => {
+  assert.deepEqual(Object.keys(ADMIN_CREATABLE_ROLES), ['teacher', 'admin', 'coordinator']);
+  assert.equal(ROLE_LABELS.coordinator, 'Coordinador');
 });

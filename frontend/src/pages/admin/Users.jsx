@@ -14,6 +14,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import FormField, { inputClass, selectClass } from '../../components/ui/FormField';
 import Toast from '../../components/ui/Toast';
 import { ADMIN_CREATABLE_ROLES, ROLE_LABELS } from '../../utils/adminAccess';
+import CoordinatorAssignmentDrawer from '../../components/CoordinatorAssignmentDrawer';
 
 const ROLE_TONES = { teacher: 'indigo', coordinator: 'info', admin: 'neutral' };
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'teacher', active: true };
@@ -33,6 +34,7 @@ export default function AdminUsers() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [deactivateTarget, setDeactivateTarget] = useState(null);
+  const [assignmentTarget, setAssignmentTarget] = useState(null);
 
   const params = { per_page: 20, page };
   if (search) params.search = search;
@@ -111,6 +113,7 @@ export default function AdminUsers() {
           {
             key: 'actions', label: 'Acciones', align: 'right', render: (u) => (
               <div className="flex justify-end gap-1">
+                {u.role === 'coordinator' && <button onClick={() => setAssignmentTarget(u)} title="Asignar secciones de supervisión" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-800"><span className="material-symbols-outlined text-[18px]">assignment_ind</span></button>}
                 <button onClick={() => openEdit(u)} title="Editar" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-800">
                   <span className="material-symbols-outlined text-[18px]">edit</span>
                 </button>
@@ -175,7 +178,6 @@ export default function AdminUsers() {
               disabled={editingUser && isSelf(editingUser)}
               onChange={(e) => setForm({ ...form, role: e.target.value })}
             >
-              {editingUser?.role === 'coordinator' && <option value="coordinator" disabled>Coordinador · Próximamente</option>}
               {Object.entries(ADMIN_CREATABLE_ROLES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </FormField>
@@ -205,6 +207,7 @@ export default function AdminUsers() {
       />
 
       <Toast toast={toast} />
+      {assignmentTarget && <CoordinatorAssignmentDrawer key={assignmentTarget.id} user={assignmentTarget} onClose={() => setAssignmentTarget(null)} />}
     </>
   );
 }
