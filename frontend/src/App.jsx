@@ -72,6 +72,7 @@ export default function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="users" element={<AdminUsers />} />
+            <Route path="coordinators" element={<AdminUsers key="coordinators" coordinatorsOnly />} />
             <Route path="students" element={<AdminStudents />} />
             <Route path="students/workspaces/:workspaceId" element={<AdminStudentWorkspace />} />
             <Route path="students/:id" element={<AdminStudentProfile />} />

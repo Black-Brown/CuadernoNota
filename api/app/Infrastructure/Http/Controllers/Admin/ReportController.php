@@ -127,7 +127,7 @@ class ReportController extends Controller
                 if ($table === 'users') {
                     $query->select([
                         'id', 'name', 'email', 'email_verified_at', 'role', 'active',
-                        'last_login', 'created_at', 'updated_at',
+                          'last_login', 'created_at', 'updated_at', 'coordinator_level',
                     ]);
                 }
 

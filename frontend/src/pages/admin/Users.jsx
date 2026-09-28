@@ -19,7 +19,7 @@ import CoordinatorAssignmentDrawer from '../../components/CoordinatorAssignmentD
 const ROLE_TONES = { teacher: 'indigo', coordinator: 'info', admin: 'neutral' };
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'teacher', active: true };
 
-export default function AdminUsers() {
+export default function AdminUsers({ coordinatorsOnly = false }) {
   const qc = useQueryClient();
   const { user: currentUser } = useAuthStore();
   const { toast, showToast } = useToast();
@@ -38,23 +38,29 @@ export default function AdminUsers() {
 
   const params = { per_page: 20, page };
   if (search) params.search = search;
-  if (role) params.role = role;
+  if (coordinatorsOnly) params.role = 'coordinator';
+  else if (role) params.role = role;
   if (active !== '') params.active = active;
 
   const { data, isLoading } = useQuery({ queryKey: ['admin-users', params], queryFn: () => getAdminUsers(params) });
   const users = data?.data || [];
 
-  const openCreate = () => { setEditingUser(null); setForm(EMPTY_FORM); setErrors({}); setDrawerOpen(true); };
-  const openEdit = (u) => { setEditingUser(u); setForm({ name: u.name, email: u.email, password: '', role: u.role, active: u.active }); setErrors({}); setDrawerOpen(true); };
+  const openCreate = () => { setEditingUser(null); setForm({ ...EMPTY_FORM, role: coordinatorsOnly ? 'coordinator' : 'teacher', coordinator_level: '' }); setErrors({}); setDrawerOpen(true); };
+  const openEdit = (u) => { setEditingUser(u); setForm({ name: u.name, email: u.email, password: '', role: u.role, active: u.active, coordinator_level: u.coordinator_level ?? '' }); setErrors({}); setDrawerOpen(true); };
 
   const saveMutation = useMutation({
     mutationFn: () => {
       const payload = { ...form };
+      // Preserve legacy grants when editing unrelated account fields.
+      if (editingUser && form.role === editingUser.role && (form.coordinator_level || null) === (editingUser.coordinator_level || null)) delete payload.coordinator_level;
+      else payload.coordinator_level = form.role === 'coordinator' ? form.coordinator_level || null : null;
       if (!payload.password) delete payload.password;
       return editingUser ? updateAdminUser(editingUser.id, payload) : createAdminUser(payload);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-users'] });
+      qc.invalidateQueries({ queryKey: ['coordinator-assignments'] });
+      qc.invalidateQueries({ queryKey: ['coordinator-dashboard'] });
       setDrawerOpen(false);
       showToast(editingUser ? 'Usuario actualizado correctamente.' : 'Usuario registrado correctamente.');
     },
@@ -76,23 +82,23 @@ export default function AdminUsers() {
   return (
     <>
       <PageHeader
-        breadcrumb={['Portal Administrativo', 'Usuarios']}
-        title="Usuarios y roles"
-        description="Administra las cuentas de docentes, coordinadores y administradores del centro."
+        breadcrumb={['Portal Administrativo', coordinatorsOnly ? 'Coordinadores' : 'Usuarios']}
+        title={coordinatorsOnly ? 'Coordinadores' : 'Usuarios y roles'}
+        description={coordinatorsOnly ? 'Gestiona las cuentas y la supervisión completa de Primaria o Secundaria.' : 'Administra las cuentas de docentes, coordinadores y administradores del centro.'}
         actions={
           <button onClick={openCreate} className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800">
             <span className="material-symbols-outlined text-[18px]">person_add</span>
-            Nuevo usuario
+            {coordinatorsOnly ? 'Nuevo coordinador' : 'Nuevo usuario'}
           </button>
         }
       />
 
       <FilterBar>
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Buscar por nombre o correo..." className="max-w-xs" />
-        <select value={role} onChange={(e) => { setRole(e.target.value); setPage(1); }} className={`${selectClass} w-auto`}>
+        {!coordinatorsOnly && <select value={role} onChange={(e) => { setRole(e.target.value); setPage(1); }} className={`${selectClass} w-auto`}>
           <option value="">Todos los roles</option>
           {Object.entries(ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
+        </select>}
         <select value={active} onChange={(e) => { setActive(e.target.value); setPage(1); }} className={`${selectClass} w-auto`}>
           <option value="">Todos los estados</option>
           <option value="1">Activo</option>
@@ -109,11 +115,12 @@ export default function AdminUsers() {
           { key: 'name', label: 'Nombre', render: (u) => <span className="font-bold text-slate-900">{u.name}</span> },
           { key: 'email', label: 'Correo' },
           { key: 'role', label: 'Rol', align: 'center', render: (u) => <StatusBadge tone={ROLE_TONES[u.role]} label={ROLE_LABELS[u.role] || u.role} /> },
+          { key: 'coordinator_level', label: 'Supervisión', render: (u) => u.role === 'coordinator' ? (u.coordinator_level || 'Pendiente de asignar nivel') : '—' },
           { key: 'active', label: 'Estado', align: 'center', render: (u) => <StatusBadge tone={u.active ? 'success' : 'neutral'} label={u.active ? 'Activo' : 'Inactivo'} /> },
           {
             key: 'actions', label: 'Acciones', align: 'right', render: (u) => (
               <div className="flex justify-end gap-1">
-                {u.role === 'coordinator' && <button onClick={() => setAssignmentTarget(u)} title="Asignar secciones de supervisión" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-800"><span className="material-symbols-outlined text-[18px]">assignment_ind</span></button>}
+                {u.role === 'coordinator' && <button onClick={() => setAssignmentTarget(u)} title="Asignar nivel de supervisión" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-800"><span className="material-symbols-outlined text-[18px]">assignment_ind</span></button>}
                 <button onClick={() => openEdit(u)} title="Editar" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-800">
                   <span className="material-symbols-outlined text-[18px]">edit</span>
                 </button>
@@ -144,14 +151,14 @@ export default function AdminUsers() {
       <SideDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        title={editingUser ? 'Editar usuario' : 'Nuevo usuario'}
+        title={coordinatorsOnly ? (editingUser ? 'Editar coordinador' : 'Nuevo coordinador') : (editingUser ? 'Editar usuario' : 'Nuevo usuario')}
         description={editingUser ? `Actualiza los datos de ${editingUser.name}.` : 'Registra una nueva cuenta de acceso.'}
         footer={
           <div className="flex justify-end gap-3">
             <button onClick={() => setDrawerOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50">Cancelar</button>
             <button
               onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending || !form.name.trim() || !form.email.trim()}
+              disabled={saveMutation.isPending || !form.name.trim() || !form.email.trim() || (!editingUser && form.role === 'coordinator' && !form.coordinator_level)}
               className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
             >
               {saveMutation.isPending && <span className="material-symbols-outlined animate-spin text-[16px]">sync</span>}
@@ -175,12 +182,19 @@ export default function AdminUsers() {
             <select
               className={selectClass}
               value={form.role}
-              disabled={editingUser && isSelf(editingUser)}
+              disabled={coordinatorsOnly || (editingUser && isSelf(editingUser))}
               onChange={(e) => setForm({ ...form, role: e.target.value })}
             >
               {Object.entries(ADMIN_CREATABLE_ROLES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </FormField>
+          {form.role === 'coordinator' && <FormField label="Nivel de supervisión" required hint="Acceso a todos los grados y secciones del nivel, incluidas las secciones nuevas.">
+            <select className={selectClass} value={form.coordinator_level || ''} onChange={e => setForm({ ...form, coordinator_level: e.target.value })}>
+              <option value="">Sin nivel asignado</option>
+              <option value="Primaria">Primaria</option>
+              <option value="Secundaria">Secundaria</option>
+            </select>
+          </FormField>}
           {editingUser && (
             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
               <input

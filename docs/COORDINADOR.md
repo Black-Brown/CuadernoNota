@@ -1,5 +1,32 @@
 # Implementación del portal de coordinación
 
+## Supervisión por nivel (2026-09-27, comportamiento vigente)
+
+Esta ampliación sustituye la selección manual de secciones en la interfaz por un nivel completo: **Primaria** o **Secundaria**. Los apartados posteriores describen la implementación anterior cuando mencionan asignaciones por sección.
+
+- Administrador → Coordinadores (`/admin/coordinators`) reutiliza la gestión de usuarios: crear, editar, activar/desactivar y asignar nivel. No duplica cuentas ni concede acceso administrativo al coordinador.
+- `users.coordinator_level` es nullable y acepta Primaria/Secundaria. Crear o editar usa los endpoints existentes `POST /api/admin/users` y `PATCH /api/admin/users/{user}`. El listado utiliza `GET /api/admin/users?role=coordinator`.
+- `grades.level` ya existía. Las opciones del catálogo son Inicial, Primaria y Secundaria. Se conserva una clasificación anterior al editarla sin cambios; nuevas clasificaciones arbitrarias se rechazan. Inicial y valores desconocidos quedan fuera del alcance de los dos niveles de coordinación. No se deduce el nivel a partir del nombre del grado.
+- `CoordinatorScope` centraliza la autorización en todos los controladores del coordinador. Consulta las secciones del nivel en cada petición; incluye automáticamente nuevos grados/secciones del mismo nivel. Tolera diferencias de mayúsculas y espacios en las clasificaciones existentes.
+- El dashboard sigue limitado al año activo; el catálogo permite consultar años históricos del nivel. Los workspaces mantienen la validación de período contra año escolar. No se mezclan secciones de otros niveles.
+- El coordinador no puede cambiar sus permisos ni eliminar estudiantes. Cambiar el nivel revoca el anterior inmediatamente en la API. Desactivar la cuenta invalida sus tokens.
+
+### Transición sin ampliar permisos silenciosamente
+
+La migración **no asigna niveles ni cambia datos académicos**. Los coordinadores anteriores sin nivel conservan exclusivamente sus secciones históricamente asignadas hasta que el administrador confirme el nuevo alcance. La interfaz los marca como pendientes de asignar nivel.
+
+Guardar explícitamente `coordinator_level` reemplaza y elimina las asignaciones anteriores por sección dentro de una transacción. Enviar `null` revoca el nivel y las asignaciones anteriores. Editar otros datos sin enviar el campo conserva el alcance. Cambiar el rol elimina los permisos de coordinación anteriores.
+
+`GET /api/admin/users/{user}/coordinator-sections` se mantiene para consultar el estado de transición y grados fuera de Primaria/Secundaria. El PUT anterior se conserva por compatibilidad solo para cuentas sin nivel; responde 409 si ya supervisan un nivel. La interfaz nueva no utiliza ese PUT.
+
+### Despliegue
+
+Aplicar `2026_09_27_000001_add_coordinator_level_to_users.php` antes de desplegar este código. Es una columna nullable, compatible con la versión anterior. La migración previa `2026_09_11_000001_create_coordinator_sections_table.php` también debe existir para la transición. El contenedor de Vercel no las ejecuta automáticamente.
+
+La migración nueva se aplicó únicamente en Docker local durante el desarrollo. Supabase/producción requieren un paso separado con autorización. No ejecutar seeders ni `migrate:fresh` en producción. La demo local anterior conserva sus asignaciones hasta que un administrador seleccione el nivel.
+
+Pruebas de regresión: creación y validación de niveles, aislamiento Primaria/Secundaria en consultas y escrituras, inclusión de secciones nuevas, exclusión de clasificaciones desconocidas, aislamiento del dashboard por año, migración explícita de permisos, cambio de nivel, revocación, rol e inactividad.
+
 ## Base y alcance
 
 Se parte de Requerimientos v4.0 (apartado 4) y CasosDeUso v3.0 (CU-10 a CU-16 y CU-29), contrastados con la aplicación existente.

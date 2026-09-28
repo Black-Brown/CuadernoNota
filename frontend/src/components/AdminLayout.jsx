@@ -10,6 +10,7 @@ const menuItems = [
     items: [
       { name: 'Inicio', icon: 'dashboard', path: '/admin/dashboard' },
       { name: 'Usuarios', icon: 'manage_accounts', path: '/admin/users' },
+      { name: 'Coordinadores', icon: 'supervisor_account', path: '/admin/coordinators' },
       { name: 'Estudiantes', icon: 'school', path: '/admin/students' },
     ],
   },

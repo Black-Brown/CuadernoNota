@@ -12,7 +12,7 @@ class AcademicManagementController extends Controller
     {
         return DB::transaction(function () use ($request, $studentId) {
             $student = \App\Infrastructure\Models\Student::where('id', $studentId)->lockForUpdate()->firstOrFail();
-            abort_unless(DB::table('coordinator_sections')->where('user_id', $request->user()->id)->where('section_id', $student->section_id)->exists(), 403);
+            abort_unless(\App\Infrastructure\Support\CoordinatorScope::allows($request->user()->id, $student->section_id), 403);
             // Only personal fields: changing section/status requires a separate enrollment workflow.
             $data = $request->validate([
                 'name' => 'required|string|max:100', 'last_name' => 'required|string|max:100',
@@ -25,7 +25,7 @@ class AcademicManagementController extends Controller
 
     private function sectionIds(Request $request)
     {
-        return DB::table('coordinator_sections')->where('user_id', $request->user()->id)->select('section_id');
+        return \App\Infrastructure\Support\CoordinatorScope::sections($request->user()->id);
     }
 
     public function catalog(Request $request)
