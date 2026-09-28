@@ -24,7 +24,10 @@ class CoordinatorPortalTest extends TestCase
         $unknown = DB::table('sections')->insertGetId(['grade_id' => $unknownGrade, 'academic_year_id' => $year, 'name' => 'A', 'shift' => 'Matutina']);
         Sanctum::actingAs($coordinator);
         $this->getJson('/api/coordinador/dashboard')->assertOk()->assertJsonPath('counts.sections', 2)->assertJsonPath('counts.students', 2);
-        $this->getJson('/api/coordinador/catalog')->assertOk()->assertJsonCount(2, 'sections');
+        $this->getJson('/api/coordinador/catalog')->assertOk()->assertJsonCount(2, 'sections')
+            ->assertJsonPath('sections.0.grade_level', 'Secundaria')
+            ->assertJsonPath('sections.0.academic_year_id', $year)
+            ->assertJsonStructure(['sections' => [['year_active', 'year_name']]]);
         $this->getJson('/api/coordinador/students')->assertOk()->assertJsonCount(2);
         $this->getJson('/api/coordinador/grade-reviews')->assertOk()->assertJsonCount(2);
         foreach ([$primary, $unknown] as $forbidden) {

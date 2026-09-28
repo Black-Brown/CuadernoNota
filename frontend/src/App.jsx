@@ -56,11 +56,11 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route
             path="/modulo-coordinador-proximamente"
-            element={<ProtectedRoute allowedRoles={['coordinator']}><Navigate to="/coordinador/dashboard" replace /></ProtectedRoute>}
+            element={<ProtectedRoute allowedRoles={['coordinator']}><Navigate to="/coordinador/reports" replace /></ProtectedRoute>}
           />
 
           <Route path="/coordinador" element={<ProtectedRoute allowedRoles={['coordinator']}><CoordinatorLayout /></ProtectedRoute>}>
-            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route index element={<Navigate to="reports" replace />} />
             <Route path="dashboard" element={<CoordinatorDashboard />} />
             {['students', 'catalog', 'institutional', 'assignments', 'reports', 'promotions', 'student-placements'].map(mode => <Route key={mode} path={mode} element={<CoordinatorManagement key={mode} mode={mode} />} />)}
             <Route path="sections/:sectionId" element={<CoordinatorStudentWorkspace />} />

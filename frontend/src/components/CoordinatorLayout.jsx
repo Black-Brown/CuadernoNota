@@ -3,6 +3,7 @@ import AppLayout from './AppLayout';
 import useAuthStore from '../store/authStore';
 
 const menuItems = [{ label: 'Supervisión académica', items: [
+  { name: 'Reportes', icon: 'analytics', path: '/coordinador/reports' },
   { name: 'Inicio', icon: 'dashboard', path: '/coordinador/dashboard' },
   { name: 'Estudiantes', icon: 'school', path: '/coordinador/students' },
   { name: 'Catálogo académico', icon: 'account_tree', path: '/coordinador/catalog' },
@@ -11,7 +12,6 @@ const menuItems = [{ label: 'Supervisión académica', items: [
   { name: 'Revisión de notas', icon: 'fact_check', path: '/coordinador/reviews' },
   { name: 'Asignación estudiantes', icon: 'group_add', path: '/coordinador/student-placements' },
   { name: 'Promoción escolar', icon: 'upgrade', path: '/coordinador/promotions' },
-  { name: 'Reportes', icon: 'analytics', path: '/coordinador/reports' },
 ] }];
 
 export default function CoordinatorLayout() {

@@ -9,7 +9,7 @@ import {
 test('cada rol entra en una ruta existente o informativa', () => {
   assert.equal(routeForRole('admin'), '/admin/dashboard');
   assert.equal(routeForRole('teacher'), '/docente/dashboard');
-  assert.equal(routeForRole('coordinator'), '/coordinador/dashboard');
+  assert.equal(routeForRole('coordinator'), '/coordinador/reports');
   assert.equal(routeForRole('unknown'), '/login');
 });
 

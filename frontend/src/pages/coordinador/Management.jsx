@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/client';
 import { getCoordinatorCatalog, getCoordinatorStudents, getCoordinatorTeachers, getCoordinatorReports } from '../../api/coordinator.api';
 import PageHeader from '../../components/ui/PageHeader';
-import DataTable from '../../components/ui/DataTable';
+import PaginatedTable from '../../components/ui/PaginatedTable';
+import CoordinatorCoursePicker from '../../components/CoordinatorCoursePicker';
 import FilterBar from '../../components/ui/FilterBar';
 import SearchInput from '../../components/ui/SearchInput';
 import SideDrawer from '../../components/ui/SideDrawer';
@@ -27,6 +28,8 @@ export default function Management({ mode }) {
   const report = useQuery({ queryKey: ['coordinator-reports', sectionId, period, date], queryFn: () => getCoordinatorReports(sectionId, { period_id: period || undefined, date: date || undefined }), enabled: mode === 'reports' && !!sectionId });
   const extra = useQuery({ queryKey: ['coordinator-management-extra', mode, sectionId], queryFn: () => api.get(mode === 'promotions' ? `/coordinador/promotions/${sectionId}` : '/coordinador/student-placements').then(r => r.data), enabled: mode === 'student-placements' || (mode === 'promotions' && !!sectionId) });
   const sections = catalog.data?.sections || [];
+  const courseMode = ['students', 'catalog', 'reports'].includes(mode);
+  const changeCourse = (id = '') => { setSectionId(String(id)); setSearch(''); setPeriod(''); setDate(''); setSelected(null); };
   const error = catalog.isError || listing.isError || report.isError || extra.isError;
   const normalize = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   let rows = [];
@@ -42,13 +45,20 @@ export default function Management({ mode }) {
     rows = (listing.data || []).filter(r => !sectionId || String(r.section_id) === sectionId);
     columns = [{ key: 'enrollment_no', label: 'Matrícula' }, { key: 'name', label: 'Estudiante', render: r => `${r.last_name}, ${r.name}` }, ...basic,
       { key: 'active', label: 'Estado', render: r => r.active ? 'Activo' : 'Inactivo' },
-      { key: 'actions', label: 'Acciones', render: r => <div className="flex gap-3"><button onClick={() => setSelected(r)} className="font-bold text-indigo-600">Editar</button>{r.active && <Link to={`/coordinador/sections/${r.section_id}`} className="font-bold text-indigo-600">Seguimiento</Link>}</div> }];
+      { key: 'actions', label: 'Acciones', render: r => <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => setSelected(r)} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-600 transition hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+          <span aria-hidden="true" className="material-symbols-outlined block shrink-0 text-[18px] leading-none">edit</span>Editar
+        </button>
+        {r.active && <Link to={`/coordinador/sections/${r.section_id}`} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+          <span aria-hidden="true" className="material-symbols-outlined block shrink-0 text-[18px] leading-none">monitoring</span>Seguimiento
+        </Link>}
+      </div> }];
   } else if (mode === 'assignments') {
     rows = listing.data || [];
     columns = [{ key: 'teacher_name', label: 'Docente' }, { key: 'subject_name', label: 'Materia' }, ...basic, { key: 'active', label: 'Estado', render: r => r.active ? 'Activa' : 'Inactiva' }];
   } else if (mode === 'catalog') {
-    rows = sections.map(s => ({ ...s, section_name: s.name, subjects: (catalog.data?.subjects || []).filter(c => c.section_id === s.id).map(c => c.name).join(', ') }));
-    columns = [...basic, { key: 'subjects', label: 'Materias' }];
+    rows = (catalog.data?.subjects || []).filter(c => String(c.section_id) === sectionId);
+    columns = [{ key: 'name', label: 'Materia' }, { key: 'active', label: 'Estado', render: r => r.active ? 'Activa' : 'Inactiva' }];
   } else if (mode === 'institutional') {
     rows = (catalog.data?.periods || []).map(p => ({ ...p, year: sections.find(s => s.academic_year_id === p.academic_year_id)?.year_name }));
     columns = [{ key: 'year', label: 'Año escolar' }, { key: 'name', label: 'Período' }, { key: 'start_date', label: 'Inicio' }, { key: 'end_date', label: 'Fin' }, { key: 'status', label: 'Estado', render: r => ({ open: 'Abierto', closed: 'Cerrado' }[r.status] || r.status) }];
@@ -63,20 +73,16 @@ export default function Management({ mode }) {
     <PageHeader breadcrumb={['Portal de Coordinación', titles[mode]]} title={titles[mode]} description="Únicamente información de tus grados y secciones asignados." />
     {['promotions', 'student-placements'].includes(mode) && <p className="mb-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500">Consulta de seguimiento. Las decisiones de promoción y la colocación siguen en el administrador en esta primera etapa; no se muestran estudiantes sin procedencia asignada.</p>}
     {['catalog', 'institutional', 'assignments'].includes(mode) && <p className="mb-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500">Consulta de tu ámbito. Los cambios globales y la administración de asignaciones permanecen a cargo del administrador.</p>}
-    {error ? <p role="alert" className="text-red-600">No se pudieron cargar los datos. <button onClick={() => { catalog.refetch(); if (['students', 'assignments'].includes(mode)) listing.refetch(); if (sectionId && mode === 'reports') report.refetch(); }}>Reintentar</button></p> : <>
-      {mode === 'reports' && !sectionId ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {catalog.isLoading && <p>Cargando cursos…</p>}
-        {sections.map(s => <button key={s.id} onClick={() => setSectionId(String(s.id))} className="rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm hover:border-indigo-400"><span className="material-symbols-outlined mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">analytics</span><h2 className="font-extrabold">{s.grade_name} · Sección {s.name}</h2><p className="mt-2 text-sm text-slate-500">{s.shift} · {s.year_name}</p><span className="mt-4 inline-block rounded-lg bg-slate-950 px-4 py-2 text-xs font-bold text-white">Abrir reporte →</span></button>)}
-        {!catalog.isLoading && !sections.length && <p>No tienes secciones asignadas.</p>}
-      </div> : <>
-        {mode === 'reports' && <><button className="mb-4 font-bold text-indigo-600" onClick={() => { setSectionId(''); setDate(''); setPeriod(''); setSearch(''); }}>← Volver a los cursos</button><h2 className="mb-4 font-extrabold">{courseLabel(sections.find(s => String(s.id) === sectionId) || {})}</h2><div className="mb-4 flex gap-3">{[['academic', 'Académico'], ['attendance', 'Asistencia']].map(([key, label]) => <button key={key} onClick={() => setTab(key)} className={`rounded-lg px-4 py-2 text-sm font-bold ${tab === key ? 'bg-slate-950 text-white' : 'bg-white text-slate-600'}`}>{label}</button>)}</div><p className="mb-4 text-xs text-slate-500">Calificaciones oficiales. Sin registro no significa cero ni ausencia.</p></>}
+    {error ? <p role="alert" className="text-red-600">No se pudieron cargar los datos. <button onClick={() => { catalog.refetch(); if (['students', 'assignments'].includes(mode)) listing.refetch(); if (sectionId && mode === 'reports') report.refetch(); if (mode === 'student-placements' || (mode === 'promotions' && sectionId)) extra.refetch(); }}>Reintentar</button></p> : <>
+      {courseMode && !sectionId ? <CoordinatorCoursePicker sections={sections} subjects={catalog.data?.subjects} students={listing.data} loading={catalog.isLoading || listing.isLoading} mode={mode} onOpen={s => changeCourse(s.id)} /> : <>
+        {courseMode && <><button className="mb-4 inline-flex items-center gap-2 font-bold text-indigo-600" onClick={() => changeCourse()}><span aria-hidden="true" className="material-symbols-outlined block leading-none">arrow_back</span>Volver a los cursos</button><h2 className="mb-4 font-extrabold">{sections.find(s => String(s.id) === sectionId) ? courseLabel(sections.find(s => String(s.id) === sectionId)) : 'Cargando curso…'}</h2></>}
+        {mode === 'reports' && <><div className="mb-4 flex gap-3">{[['academic', 'Académico'], ['attendance', 'Asistencia']].map(([key, label]) => <button key={key} onClick={() => { setTab(key); setSearch(''); }} className={`rounded-lg px-4 py-2 text-sm font-bold ${tab === key ? 'bg-slate-950 text-white' : 'bg-white text-slate-600'}`}>{label}</button>)}</div><p className="mb-4 text-xs text-slate-500">Calificaciones oficiales. Sin registro no significa cero ni ausencia.</p></>}
         <FilterBar><SearchInput value={search} onChange={setSearch} placeholder="Buscar…" />
           {mode === 'promotions' && <select aria-label="Curso" className={selectClass} value={sectionId} onChange={e => setSectionId(e.target.value)}><option value="">Seleccionar curso</option>{sections.map(s => <option key={s.id} value={s.id}>{courseLabel(s)}</option>)}</select>}
-          {mode === 'students' && <select aria-label="Curso" className={selectClass} value={sectionId} onChange={e => setSectionId(e.target.value)}><option value="">Todos mis cursos</option>{sections.map(s => <option key={s.id} value={s.id}>{courseLabel(s)}</option>)}</select>}
           {mode === 'reports' && (tab === 'academic' ? <select aria-label="Período" className={selectClass} value={period} onChange={e => setPeriod(e.target.value)}><option value="">Todos los períodos</option>{report.data?.periods.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select> : <input aria-label="Fecha" type="date" className={inputClass} value={date || report.data?.date || ''} onChange={e => setDate(e.target.value)} />)}
         </FilterBar>
         {mode === 'reports' && <button disabled={!rows.length} onClick={() => downloadCsv(`reporte-coordinador-${tab}`, [columns.map(c => c.label), ...rows.map(r => columns.map(c => c.render ? c.render(r) : r[c.key]))])} className="mb-3 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold disabled:opacity-40">Exportar CSV</button>}
-        <DataTable rows={rows} rowKey={r => r.id ?? r.enrollment_id} columns={columns} loading={catalog.isLoading || listing.isLoading || report.isLoading || extra.isLoading} emptyTitle="No hay registros en tu ámbito para esta selección." />
+        <PaginatedTable rows={rows} resetKey={`${mode}:${sectionId}:${search}:${period}:${date}:${tab}`} rowKey={r => r.id ?? r.enrollment_id} columns={columns} loading={catalog.isLoading || listing.isLoading || report.isLoading || extra.isLoading} emptyTitle="No hay registros en tu ámbito para esta selección." />
       </>}
     </>}
     {selected && <EditStudent student={selected} onClose={() => setSelected(null)} />}

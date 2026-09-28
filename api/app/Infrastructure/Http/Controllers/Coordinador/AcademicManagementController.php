@@ -33,7 +33,7 @@ class AcademicManagementController extends Controller
         $sections = DB::table('sections')->join('grades', 'sections.grade_id', '=', 'grades.id')
             ->join('academic_years', 'sections.academic_year_id', '=', 'academic_years.id')
             ->whereIn('sections.id', $this->sectionIds($request))->orderByDesc('academic_years.start_date')->orderBy('grades.sort_order')->orderBy('sections.name')
-            ->get(['sections.id', 'sections.name', 'sections.shift', 'sections.grade_id', 'sections.academic_year_id', 'grades.name as grade_name', 'academic_years.name as year_name']);
+            ->get(['sections.id', 'sections.name', 'sections.shift', 'sections.grade_id', 'sections.academic_year_id', 'grades.name as grade_name', 'grades.level as grade_level', 'academic_years.name as year_name', 'academic_years.active as year_active']);
         $periods = DB::table('periods')->whereIn('academic_year_id', $sections->pluck('academic_year_id'))->orderBy('number')->get();
         $subjects = DB::table('course_offerings')->join('subjects', 'course_offerings.subject_id', '=', 'subjects.id')
             ->whereIn('section_id', $sections->pluck('id'))->get(['course_offerings.id', 'section_id', 'subject_id', 'subjects.name', 'course_offerings.active']);
