@@ -1,6 +1,6 @@
 export const ROLE_ROUTES = Object.freeze({
   teacher: '/docente/dashboard',
-  coordinator: '/coordinador/reports',
+  coordinator: '/coordinador/dashboard',
   admin: '/admin/dashboard',
 });
 

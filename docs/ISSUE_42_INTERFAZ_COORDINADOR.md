@@ -1,6 +1,6 @@
 # Issue #42: interfaz del coordinador
 
-- Reportes es la primera opción del menú y el destino al iniciar sesión o entrar a `/coordinador`.
+- Reportes es la primera opción del menú. Inicio conserva el dashboard, que también es el destino al iniciar sesión o entrar a `/coordinador`.
 - Estudiantes, Catálogo y Reportes utilizan tarjetas por curso, con filtro de año escolar y búsqueda por grado, sección y tanda.
 - Las tarjetas completas son clicables y conservan una acción visible. Los iconos usan contenedores centrados y el estilo existente.
 - Cada workspace mantiene el identificador de su sección; no mezcla cursos de distintos años.
