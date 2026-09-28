@@ -21,6 +21,7 @@ class User extends Authenticatable
         'email_verified_at',
         'password',
         'role',
+        'coordinator_level',
         'active',
         'last_login',
     ];

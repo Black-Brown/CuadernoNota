@@ -10,8 +10,7 @@ class StudentWorkspaceController extends Controller
 {
     private function context(Request $request, int $sectionId): array
     {
-        abort_unless(DB::table('coordinator_sections')->where('user_id', $request->user()->id)
-            ->where('section_id', $sectionId)->exists(), 403, 'Esta sección no está bajo tu supervisión.');
+        abort_unless(\App\Infrastructure\Support\CoordinatorScope::allows($request->user()->id, $sectionId), 403, 'Esta sección no está bajo tu supervisión.');
         $section = DB::table('sections')->join('grades', 'grades.id', '=', 'sections.grade_id')
             ->join('academic_years', 'academic_years.id', '=', 'sections.academic_year_id')
             ->where('sections.id', $sectionId)->first(['sections.*', 'grades.name as grade_name', 'academic_years.name as year_name']);

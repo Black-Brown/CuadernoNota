@@ -356,7 +356,7 @@ class AcademicCatalogController extends Controller
     ]; }
     private function gradeRules(?Grade $grade = null): array { return [
         'name' => [$grade ? 'sometimes' : 'required', 'string', 'max:30', Rule::unique('grades')->ignore($grade?->id)],
-        'level' => [$grade ? 'sometimes' : 'required', 'string', 'max:20'], 'sort_order' => [$grade ? 'sometimes' : 'required', 'integer', 'between:1,127'],
+        'level' => [$grade ? 'sometimes' : 'required', 'string', Rule::in(array_filter(['Inicial', 'Primaria', 'Secundaria', $grade?->level]))], 'sort_order' => [$grade ? 'sometimes' : 'required', 'integer', 'between:1,127'],
     ]; }
     private function sectionRules(?Section $section = null): array
     {

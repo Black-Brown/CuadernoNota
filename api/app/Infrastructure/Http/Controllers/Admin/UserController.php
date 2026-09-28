@@ -7,6 +7,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use App\Infrastructure\Support\CoordinatorScope;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -30,6 +32,7 @@ class UserController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate($this->rules());
+        if ($data['role'] !== 'coordinator') $data['coordinator_level'] = null;
         $user = User::create([
             ...$data,
             'email' => mb_strtolower($data['email']),
@@ -51,11 +54,16 @@ class UserController extends Controller
             throw ValidationException::withMessages(['user' => 'No puedes quitarte tu propio acceso administrativo.']);
         }
 
-        $wasActive = $user->active;
-        $user->update($data);
-        if ($wasActive && ! $user->fresh()->active) {
-            $user->tokens()->delete();
-        }
+        DB::transaction(function () use ($user, $data) {
+            $locked = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+            if (($data['role'] ?? $locked->role) !== 'coordinator') $data['coordinator_level'] = null;
+            // An explicit level selection/revocation replaces legacy section grants atomically.
+            if (array_key_exists('coordinator_level', $data) || (isset($data['role']) && $data['role'] !== $locked->role)) {
+                DB::table('coordinator_sections')->where('user_id', $locked->id)->delete();
+            }
+            $locked->update($data);
+            if (! $locked->active) $locked->tokens()->delete();
+        });
         return response()->json($user->fresh());
     }
 
@@ -77,6 +85,7 @@ class UserController extends Controller
             'email' => [$sometimes, 'email', 'max:255', Rule::unique('users')->ignore($user?->id)],
             'password' => ['nullable', 'string', 'min:8'],
             'role' => [$sometimes, Rule::in(['teacher', 'coordinator', 'admin'])],
+            'coordinator_level' => ['sometimes', 'nullable', Rule::in(CoordinatorScope::LEVELS)],
             'active' => ['sometimes', 'boolean'],
         ];
     }

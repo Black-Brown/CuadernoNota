@@ -10,8 +10,7 @@ class DashboardController extends Controller
     public function __invoke()
     {
         $year = DB::table('academic_years')->where('active', true)->first();
-        $sections = DB::table('sections')->whereIn('sections.id', DB::table('coordinator_sections')
-            ->where('user_id', auth()->id())->select('section_id'))
+        $sections = DB::table('sections')->whereIn('sections.id', \App\Infrastructure\Support\CoordinatorScope::sections(auth()->id()))
             ->where('sections.academic_year_id', $year?->id ?? 0)
             ->join('grades', 'grades.id', '=', 'sections.grade_id')
             ->orderBy('grades.sort_order')->orderBy('sections.name')
@@ -24,6 +23,7 @@ class DashboardController extends Controller
             ->select('section_id', 'subject_id', 'period_id')->distinct()->get()->count();
         return response()->json([
             'active_academic_year' => $year,
+            'coordinator_level' => auth()->user()->coordinator_level,
             'sections' => $sections,
             'counts' => ['sections' => $sections->count(), 'students' => $students->count(), 'pending_reviews' => $pending],
         ]);

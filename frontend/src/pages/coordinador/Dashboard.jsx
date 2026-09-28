@@ -11,7 +11,7 @@ export default function CoordinatorDashboard() {
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['coordinator-dashboard'], queryFn: getCoordinatorDashboard });
   return <>
     <PageHeader breadcrumb={['Portal de Coordinación', 'Inicio']} title="Supervisión académica"
-      description={`Secciones bajo tu supervisión · ${data?.active_academic_year?.name ?? 'Sin año escolar activo'}`}
+      description={`${data?.coordinator_level ? `Supervisión de ${data.coordinator_level}` : 'Secciones bajo tu supervisión'} · ${data?.active_academic_year?.name ?? 'Sin año escolar activo'}`}
       actions={<Link to="/coordinador/reviews" className="rounded-lg bg-slate-950 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800">Revisar calificaciones</Link>} />
     {isError ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">No se pudo cargar la supervisión. <button onClick={() => refetch()} className="font-bold underline">Reintentar</button></div> : <>
       <div className="mb-6 grid gap-4 sm:grid-cols-3">

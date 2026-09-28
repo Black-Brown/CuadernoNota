@@ -8,14 +8,12 @@ class GradeReviewController extends \App\Infrastructure\Http\Controllers\Admin\G
 {
     protected function scopeReviews($query)
     {
-        return $query->whereIn('period_grades.section_id', DB::table('coordinator_sections')
-            ->where('user_id', auth()->id())->select('section_id'));
+        return $query->whereIn('period_grades.section_id', \App\Infrastructure\Support\CoordinatorScope::sections(auth()->id()));
     }
 
     protected function authorizeWorkspace(int $sectionId, int $subjectId, int $periodId): void
     {
-        abort_unless(DB::table('coordinator_sections')->where('user_id', auth()->id())
-            ->where('section_id', $sectionId)->exists(), 403, 'Esta sección no está bajo tu supervisión.');
+        abort_unless(\App\Infrastructure\Support\CoordinatorScope::allows(auth()->id(), $sectionId), 403, 'Esta sección no está bajo tu supervisión.');
         abort_unless(DB::table('sections')->join('periods', 'periods.academic_year_id', '=', 'sections.academic_year_id')
             ->where('sections.id', $sectionId)->where('periods.id', $periodId)->exists(), 422, 'El período no pertenece al año de la sección.');
         abort_unless(DB::table('course_offerings')->where('section_id', $sectionId)

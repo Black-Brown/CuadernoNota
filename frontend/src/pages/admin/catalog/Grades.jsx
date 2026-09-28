@@ -179,7 +179,13 @@ export default function Grades() {
             <input className={inputClass} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </FormField>
           <FormField label="Nivel" required hint="Ej. Primaria, Secundaria">
-            <input className={inputClass} value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })} />
+            <select className={inputClass} value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })}>
+              <option value="">Seleccionar nivel</option>
+              {form.level && !['Inicial', 'Primaria', 'Secundaria'].includes(form.level) && <option value={form.level}>{form.level} (clasificación actual)</option>}
+              <option value="Inicial">Inicial</option>
+              <option value="Primaria">Primaria</option>
+              <option value="Secundaria">Secundaria</option>
+            </select>
           </FormField>
           <FormField label="Orden" required hint="Determina el orden de visualización">
             <input type="number" min="1" max="127" className={inputClass} value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: e.target.value })} />
