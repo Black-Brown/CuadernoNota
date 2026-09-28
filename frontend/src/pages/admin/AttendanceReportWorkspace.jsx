@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import LevelWorkspace from '../../components/admin/LevelWorkspace';
 import { useQuery } from '@tanstack/react-query';
 import { getAttendanceCourses, getAttendanceRecords } from '../../api/admin.api';
 import DataTable from '../../components/ui/DataTable';
@@ -21,15 +22,15 @@ export default function AttendanceReportWorkspace({ yearId, yearName }) {
   if (!course) return <section className="mb-8">
     <h2 className="mb-2 text-lg font-extrabold">Registro diario por curso</h2>
     <p className="mb-4 text-sm text-slate-500">Abre una sección para consultar la asistencia por día y materia.</p>
-    {courses.isError ? <p role="alert" className="text-red-600">No se pudieron cargar los cursos. <button onClick={() => courses.refetch()}>Reintentar</button></p> : courses.isLoading ? <p>Cargando cursos…</p> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {courses.data?.map(c => <button key={c.id} onClick={() => { setCourse(c); setDate(''); setSubject(''); setSearch(''); }} className="rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500">
+    {courses.isError ? <p role="alert" className="text-red-600">No se pudieron cargar los cursos. <button onClick={() => courses.refetch()}>Reintentar</button></p> : courses.isLoading ? <p>Cargando cursos…</p> : <LevelWorkspace items={courses.data}>{levelCourses => <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {levelCourses.map(c => <button key={c.id} onClick={() => { setCourse(c); setDate(''); setSubject(''); setSearch(''); }} className="rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500">
         <span className="material-symbols-outlined mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">fact_check</span>
         <h3 className="font-extrabold">{c.grade} · Sección {c.section}</h3>
         <p className="mt-2 text-sm text-slate-500">{c.shift} · {yearName}</p>
         <span className="mt-5 inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-xs font-bold text-white">Abrir registro <span className="material-symbols-outlined text-base">arrow_forward</span></span>
       </button>)}
-      {!courses.data?.length && <p className="text-slate-500">No hay secciones en este año escolar.</p>}
-    </div>}
+      {!levelCourses.length && <p className="text-slate-500">No hay secciones de este nivel en este año escolar.</p>}
+    </div>}</LevelWorkspace>}
   </section>;
   return <section className="mb-8">
     <button onClick={() => setCourse(null)} className="mb-4 text-sm font-bold text-indigo-600">← Volver a los cursos</button>

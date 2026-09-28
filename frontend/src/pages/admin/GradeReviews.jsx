@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import LevelWorkspace from '../../components/admin/LevelWorkspace';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getGradeReviews } from '../../api/admin.api';
@@ -42,9 +43,10 @@ export default function GradeReviews({
       </FilterBar>
 
       {isError && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">No se pudieron cargar las calificaciones. Intenta nuevamente.</p>}
-      <DataTable
+      <LevelWorkspace items={data} enabled={queryPrefix === 'admin'} loading={isLoading} unit="grupos de calificaciones">
+      {levelRows => <DataTable
         loading={isLoading}
-        rows={data}
+        rows={levelRows}
         rowKey={(row) => `${row.section_id}-${row.subject_id}-${row.period_id}`}
         emptyIcon="fact_check"
         emptyTitle="No hay calificaciones en este estado."
@@ -58,7 +60,8 @@ export default function GradeReviews({
           { key: 'average', label: 'Promedio', align: 'center', render: (r) => r.average != null ? Number(r.average).toFixed(1) : '—' },
           { key: 'status', label: 'Estado', align: 'center', render: () => <StatusBadge tone={tone} label={STATUS_OPTIONS.find((s) => s.value === status)?.label} /> },
         ]}
-      />
+      />}
+      </LevelWorkspace>
     </>
   );
 }

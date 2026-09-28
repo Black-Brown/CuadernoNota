@@ -16,7 +16,7 @@ class ReportController extends Controller
         $data = $request->validate(['academic_year_id' => 'required|integer|exists:academic_years,id']);
         return response()->json(DB::table('sections')->join('grades', 'sections.grade_id', '=', 'grades.id')
             ->where('sections.academic_year_id', $data['academic_year_id'])
-            ->select('sections.id', 'grades.name as grade', 'sections.name as section', 'sections.shift')
+            ->select('sections.id', 'grades.name as grade', 'grades.level as grade_level', 'sections.name as section', 'sections.shift')
             ->orderBy('grades.sort_order')->orderBy('sections.name')->orderBy('sections.shift')->get());
     }
 

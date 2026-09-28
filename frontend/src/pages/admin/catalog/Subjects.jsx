@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import LevelWorkspace from '../../../components/admin/LevelWorkspace';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createSubject, deactivateSubject, getGrades, getSubjects, updateSubject } from '../../../api/admin.api';
 import useToast from '../../../hooks/useToast';
@@ -115,14 +116,15 @@ export default function Subjects() {
             <input className={inputClass} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
           </FormField>
           <FormField label="Grados en los que se imparte" required>
-            <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3">
-              {selectableGrades?.map((g) => (
+            <LevelWorkspace items={selectableGrades} unit="grados">{levelGrades => <div className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-2">
+              {levelGrades.map((g) => (
                 <label key={g.id} className="flex items-center gap-2 text-sm text-slate-700">
                   <input type="checkbox" checked={form.grade_ids.includes(g.id)} onChange={() => toggleGrade(g.id)} />
                   {g.name}
                 </label>
               ))}
-            </div>
+              {!levelGrades.length && <p className="text-sm text-slate-500">No hay grados disponibles en este nivel.</p>}
+            </div>}</LevelWorkspace>
           </FormField>
           {editing && (
             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">

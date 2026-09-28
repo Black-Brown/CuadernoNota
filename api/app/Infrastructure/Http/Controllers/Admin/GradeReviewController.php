@@ -32,8 +32,8 @@ class GradeReviewController extends Controller
             ->join('subjects', 'period_grades.subject_id', '=', 'subjects.id')
             ->join('periods', 'period_grades.period_id', '=', 'periods.id')
             ->where('period_grades.status', $request->input('status', 'in_review'))
-            ->select('sections.id as section_id', 'periods.id as period_id', 'subjects.id as subject_id', 'grades.name as grade_name', 'sections.name as section_name', 'subjects.name as subject_name', 'periods.name as period_name', DB::raw('COUNT(*) as student_count'), DB::raw('AVG(period_grades.period_score) as average'))
-            ->groupBy('sections.id', 'periods.id', 'subjects.id', 'grades.name', 'sections.name', 'subjects.name', 'periods.name')
+            ->select('sections.id as section_id', 'periods.id as period_id', 'subjects.id as subject_id', 'grades.name as grade_name', 'grades.level as grade_level', 'sections.name as section_name', 'subjects.name as subject_name', 'periods.name as period_name', DB::raw('COUNT(*) as student_count'), DB::raw('AVG(period_grades.period_score) as average'))
+            ->groupBy('sections.id', 'periods.id', 'subjects.id', 'grades.name', 'grades.level', 'sections.name', 'subjects.name', 'periods.name')
             ->orderBy('periods.id')->get();
         // AVG on a numeric column comes back from PDO as a string on MySQL/PostgreSQL (unlike SQLite), so cast explicitly.
         $rows->each(fn ($row) => $row->average = $row->average === null ? null : (float) $row->average);

@@ -18,6 +18,16 @@ class TeacherAssignmentController extends Controller
     public function options(): JsonResponse
     {
         return response()->json([
+            // Include sections even before their subjects are configured. A section is
+            // not an assignable course until a subject offering exists.
+            'sections' => DB::table('sections')
+                ->join('grades', 'sections.grade_id', '=', 'grades.id')
+                ->join('academic_years', 'sections.academic_year_id', '=', 'academic_years.id')
+                ->where('grades.active', true)
+                ->orderByDesc('academic_years.start_date')->orderBy('grades.sort_order')->orderBy('sections.name')
+                ->get(['sections.id as section_id', 'grades.id as grade_id', 'grades.level as grade_level',
+                    'grades.name as grade_name', 'sections.name as section_name', 'sections.shift',
+                    'academic_years.id as academic_year_id', 'academic_years.name as academic_year_name']),
             'teachers' => User::query()
                 ->where('role', 'teacher')
                 ->orderBy('name')
@@ -29,6 +39,7 @@ class TeacherAssignmentController extends Controller
                 ->join('academic_years', 'sections.academic_year_id', '=', 'academic_years.id')
                 ->where('course_offerings.active', true)
                 ->where('subjects.active', true)
+                ->where('grades.active', true)
                 ->orderBy('academic_years.start_date', 'desc')
                 ->orderBy('grades.sort_order')
                 ->orderBy('sections.name')
@@ -37,6 +48,9 @@ class TeacherAssignmentController extends Controller
                     'course_offerings.id',
                     'sections.id as section_id',
                     'subjects.id as subject_id',
+                    'grades.id as grade_id',
+                    'grades.level as grade_level',
+                    'academic_years.id as academic_year_id',
                     'grades.name as grade_name',
                     'sections.name as section_name',
                     'sections.shift',

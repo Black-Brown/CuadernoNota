@@ -7,7 +7,7 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "test": "node --test tests/js/adminAccess.test.js tests/js/teacherCourseFilters.test.js"
+        "test": "node --test tests/js/adminAccess.test.js tests/js/teacherCourseFilters.test.js tests/js/academicLevels.test.js tests/js/groupAssignmentCourses.test.js"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

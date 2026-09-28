@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import LevelWorkspace from '../../components/admin/LevelWorkspace';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createAdminStudent, getAcademicYears, getAdminStudents, getStudentWorkspaces } from '../../api/admin.api';
@@ -212,8 +213,11 @@ function StudentWorkspaceCards({ data, loading, onOpen }) {
       <Kpi label="Inactivos" value={summary.inactive_students || 0} icon="person_off" />
     </section>
 
-    {workspaces.length === 0 && !hasPending ? <EmptyState icon="groups" title="No hay estudiantes organizados para este año escolar" description="Registra estudiantes o asígnalos a una sección para crear sus workspaces." /> : <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-      {workspaces.map((workspace) => <WorkspaceCard key={workspace.id} workspace={workspace} onOpen={() => onOpen(workspace.id)} />)}
+    <LevelWorkspace items={workspaces}>{levelWorkspaces => <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      {!levelWorkspaces.length && <EmptyState icon="groups" title="No hay cursos de este nivel para este año escolar" />}
+      {levelWorkspaces.map((workspace) => <WorkspaceCard key={workspace.id} workspace={workspace} onOpen={() => onOpen(workspace.id)} />)}
+    </section>}</LevelWorkspace>
+    <section className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
       {hasPending && <article role="link" tabIndex={0} aria-label="Abrir workspace de pendientes de asignación" onClick={() => onOpen('pending')} onKeyDown={(event) => { if (event.currentTarget === event.target && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpen('pending'); } }} className="cursor-pointer overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2">
         <div className="border-b border-amber-100 bg-amber-50/70 px-5 py-5">
           <div className="flex items-start justify-between gap-3"><div><span className="inline-flex rounded-md bg-amber-100 px-2 py-1 text-[9px] font-extrabold uppercase text-amber-800">Requiere asignación</span><p className="mt-4 text-[10px] font-extrabold uppercase tracking-wider text-amber-600">Workspace especial</p><h2 className="mt-1 text-xl font-extrabold text-slate-950">Pendientes de asignación</h2></div><span aria-hidden="true" className="material-symbols-outlined relative top-[3px] text-3xl text-amber-500">group_add</span></div>
@@ -221,7 +225,7 @@ function StudentWorkspaceCards({ data, loading, onOpen }) {
         </div>
         <div className="p-5"><div className="grid grid-cols-3 gap-2 border-b border-slate-100 pb-5 text-center"><Stat label="Estudiantes" value={pending.students_count} /><Stat label="Activos" value={pending.active_students_count} /><Stat label="Inactivos" value={pending.inactive_students_count} /></div><div className="mt-5 flex items-center justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Workspace de estudiantes</p><p className="mt-1 text-xs text-slate-500">Sin sección actual</p></div><button type="button" onClick={(event) => { event.stopPropagation(); onOpen('pending'); }} className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800">Abrir <span aria-hidden="true" className="material-symbols-outlined text-[18px]">arrow_forward</span></button></div></div>
       </article>}
-    </section>}
+    </section>
   </>;
 }
 

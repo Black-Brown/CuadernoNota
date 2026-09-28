@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import LevelWorkspace from '../../components/admin/LevelWorkspace';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createAssignments, createTeacher, deactivateAssignment, deleteAssignment, getAssignmentOptions, getAssignments, updateAssignment } from '../../api/admin.api';
 import useToast from '../../hooks/useToast';
@@ -40,14 +42,15 @@ export default function Assignments() {
   const [toggleTarget, setToggleTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const { data: options } = useQuery({ queryKey: ['admin-assignment-options'], queryFn: getAssignmentOptions });
+  const { data: options, isLoading: optionsLoading, error: optionsError } = useQuery({ queryKey: ['admin-assignment-options'], queryFn: getAssignmentOptions });
   const { data: assignments, isLoading, error: assignmentsError } = useQuery({ queryKey: ['admin-assignments'], queryFn: getAssignments });
 
   const courses = options?.courses || [];
+  const sections = options?.sections || [];
   const teachers = (options?.teachers || []).filter((t) => t.active);
 
-  const years = useMemo(() => uniqueBy(courses, 'academic_year_name'), [courses]);
-  const gradesList = useMemo(() => uniqueBy(courses, 'grade_name'), [courses]);
+  const years = useMemo(() => uniqueBy(sections, 'academic_year_name'), [sections]);
+  const gradesList = useMemo(() => uniqueBy(sections, 'grade_name'), [sections]);
   const sectionsList = useMemo(() => uniqueBy(courses, 'section_name'), [courses]);
   const subjectsList = useMemo(() => uniqueBy(courses, 'subject_name'), [courses]);
   const assignedCourseIds = useMemo(() => new Set((assignments || [])
@@ -60,6 +63,7 @@ export default function Assignments() {
     return !courseSearch.trim() || text.includes(courseSearch.trim().toLocaleLowerCase('es'));
   }), [courses, drawerYear, drawerGrade, courseSearch]);
   const subjectGroups = useMemo(() => groupAssignmentCourses(selectableCourses), [selectableCourses]);
+  const selectableSections = sections.filter(section => (!drawerYear || section.academic_year_name === drawerYear) && (!drawerGrade || section.grade_name === drawerGrade));
   const openSubject = subjectGroups.find((group) => group.key === openSubjectKey) || null;
   const statusCounts = useMemo(() => ({
     active: (assignments || []).filter((assignment) => assignment.active).length,
@@ -179,9 +183,10 @@ export default function Assignments() {
 
       {assignmentsError && <p role="alert" className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{getErrorMessage(assignmentsError)}</p>}
 
-      <DataTable
+      <LevelWorkspace items={filteredRows} getLevel={a => a.course_offering?.section?.grade?.level} unit="asignaciones" loading={isLoading}>
+      {levelRows => <DataTable
         loading={isLoading}
-        rows={filteredRows}
+        rows={levelRows}
         emptyIcon="assignment_ind"
         emptyTitle={filterStatus === 'active' ? 'No hay asignaciones activas que coincidan con los filtros.' : filterStatus === 'inactive' ? 'No hay asignaciones inactivas que coincidan con los filtros.' : 'No hay asignaciones que coincidan con los filtros.'}
         columns={[
@@ -225,7 +230,8 @@ export default function Assignments() {
             ),
           },
         ]}
-      />
+      />}
+      </LevelWorkspace>
 
       <SideDrawer
         open={drawerOpen}
@@ -249,6 +255,7 @@ export default function Assignments() {
       >
         <div className="space-y-4">
           {error && <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{error}</div>}
+          {optionsError && <p role="alert" className="text-sm text-red-700">{getErrorMessage(optionsError)}</p>}
 
           <div className="flex gap-2 rounded-lg border border-slate-200 p-1">
             <button onClick={() => setTeacherMode('existing')} className={`flex-1 rounded-md py-1.5 text-xs font-bold ${teacherMode === 'existing' ? 'bg-slate-950 text-white' : 'text-slate-500'}`}>Docente existente</button>
@@ -294,8 +301,20 @@ export default function Assignments() {
               <span className="text-xs text-slate-500">{subjectGroups.length} materias · {selectableCourses.length} cursos</span>
               <button type="button" disabled={!courseOfferingIds.length} onClick={() => setCourseOfferingIds([])} className="text-xs font-bold text-slate-500 disabled:opacity-40">Limpiar selección</button>
             </div>
+            <LevelWorkspace items={selectableSections} unit="secciones" loading={optionsLoading}>
+            {levelSections => {
+              const ids = new Set(levelSections.map(s => Number(s.section_id)));
+              const groups = groupAssignmentCourses(selectableCourses.filter(c => ids.has(Number(c.section_id))));
+              const missing = levelSections.filter(s => !courses.some(c => Number(c.section_id) === Number(s.section_id)));
+              return <>
+              {missing.length > 0 && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <p className="font-bold">{missing.length} secciones sin materias disponibles</p>
+                <p className="mt-1">Vincula materias activas a sus grados para poder asignar docentes. No se crearán materias automáticamente.</p>
+                <ul className="my-2 max-h-36 list-inside list-disc overflow-y-auto text-xs">{missing.map(s => <li key={s.section_id}>{s.grade_name} · {s.section_name} · {s.shift} · {s.academic_year_name}</li>)}</ul>
+                <Link to="/admin/institutional?tab=subjects" className="font-bold underline">Configurar materias por grado</Link>
+              </div>}
             <div className="max-h-[46dvh] space-y-3 overflow-y-auto pr-1">
-              {subjectGroups.length === 0 ? <p className="rounded-lg border border-dashed border-slate-200 p-5 text-center text-sm text-slate-500">No hay materias para estos filtros.</p> : subjectGroups.map((group) => {
+              {groups.length === 0 ? <p className="rounded-lg border border-dashed border-slate-200 p-5 text-center text-sm text-slate-500">No hay materias disponibles para este nivel y estos filtros.</p> : groups.map((group) => {
                 const availableIds = group.courses.map((course) => Number(course.id)).filter((id) => !assignedCourseIds.has(id));
                 const selectedCount = availableIds.filter((id) => courseOfferingIds.includes(id)).length;
                 return <button type="button" key={group.key} onClick={() => setOpenSubjectKey(group.key)} className={`flex w-full items-center gap-3 rounded-xl border bg-white p-3 text-left transition-all hover:border-slate-400 hover:shadow-sm ${selectedCount ? 'border-indigo-400 ring-1 ring-indigo-100' : 'border-slate-200'}`}>
@@ -309,6 +328,9 @@ export default function Assignments() {
                     </button>;
               })}
             </div>
+              </>;
+            }}
+            </LevelWorkspace>
           </div>
         </div>
       </SideDrawer>

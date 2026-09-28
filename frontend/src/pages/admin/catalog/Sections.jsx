@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import LevelWorkspace from '../../../components/admin/LevelWorkspace';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createSection, deleteSection, getAcademicYears, getGrades, getSections, updateSection } from '../../../api/admin.api';
 import useToast from '../../../hooks/useToast';
@@ -98,9 +99,10 @@ export default function Sections({ lockedYearId = null, periodId = null, readOnl
         </select>
       </FilterBar>
 
-      <DataTable
+      <LevelWorkspace items={data} unit="secciones" loading={isLoading}>
+      {levelRows => <DataTable
         loading={isLoading}
-        rows={data}
+        rows={levelRows}
         emptyIcon="domain"
         emptyTitle="No hay secciones que coincidan con los filtros."
         columns={[
@@ -127,7 +129,8 @@ export default function Sections({ lockedYearId = null, periodId = null, readOnl
             ),
           },
         ]}
-      />
+      />}
+      </LevelWorkspace>
 
       <SideDrawer
         open={drawerOpen}

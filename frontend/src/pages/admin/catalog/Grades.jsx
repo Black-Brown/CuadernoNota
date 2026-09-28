@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import LevelWorkspace from '../../../components/admin/LevelWorkspace';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -127,9 +128,10 @@ export default function Grades() {
         ))}
       </FilterBar>
 
-      <DataTable
+      <LevelWorkspace items={data} unit="grados" loading={isLoading}>
+      {levelRows => <DataTable
         loading={isLoading}
-        rows={data}
+        rows={levelRows}
         emptyIcon="stairs"
         emptyTitle="No hay grados registrados."
         columns={[
@@ -157,7 +159,8 @@ export default function Grades() {
             ),
           },
         ]}
-      />
+      />}
+      </LevelWorkspace>
 
       <SideDrawer
         open={drawerOpen}

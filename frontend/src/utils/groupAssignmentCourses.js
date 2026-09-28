@@ -1,7 +1,9 @@
+import { academicLevel } from './academicLevels.js';
+
 export function groupAssignmentCourses(courses) {
   const groups = new Map();
   for (const course of courses) {
-    const key = String(course.subject_id ?? course.subject_name);
+    const key = `${academicLevel(course.grade_level)}\u0000${course.subject_id ?? course.subject_name}`;
     if (!groups.has(key)) groups.set(key, { key, name: course.subject_name, courses: [] });
     groups.get(key).courses.push(course);
   }
@@ -19,7 +21,7 @@ export function groupSubjectSections(courses) {
   const groups = new Map();
   for (const course of courses) {
     // The compound key prevents Section A from one grade/year being mixed with another.
-    const key = `${course.academic_year_name}\u0000${course.grade_name}`;
+    const key = `${course.academic_year_id ?? course.academic_year_name}\u0000${course.grade_id ?? `${course.grade_level ?? ''}:${course.grade_name}`}`;
     if (!groups.has(key)) groups.set(key, { key, year: course.academic_year_name, grade: course.grade_name, courses: [] });
     groups.get(key).courses.push(course);
   }

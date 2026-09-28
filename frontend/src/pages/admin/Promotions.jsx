@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import LevelWorkspace from '../../components/admin/LevelWorkspace';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAcademicYears, getPromotionCandidates } from '../../api/admin.api';
@@ -22,7 +23,7 @@ export default function Promotions() {
     const groups = new Map();
     candidates.forEach((student) => {
       if (!groups.has(student.section_id)) groups.set(student.section_id, {
-        id: student.section_id, grade: student.grade_name, section: student.section_name,
+        id: student.section_id, grade: student.grade_name, section: student.section_name, grade_level: student.grade_level,
         shift: student.shift, year: student.academic_year_name, students: [],
         promotionOpen: student.promotion_open, promotionBlockReason: student.promotion_block_reason,
       });
@@ -47,8 +48,9 @@ export default function Promotions() {
       <Kpi label="Elegibles" value={eligible} icon="verified" />
       <Kpi label="Procesados" value={decided} icon="task_alt" />
     </section>
-    {isLoading ? <LoadingSkeleton /> : courses.length === 0 ? <div className="rounded-xl border border-slate-200 bg-white"><EmptyState icon="upgrade" title="No hay cursos con estudiantes para este año escolar" /></div> : <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-      {courses.map((course) => {
+    {isLoading ? <LoadingSkeleton /> : <LevelWorkspace items={courses}>{levelCourses => <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      {!levelCourses.length && <EmptyState icon="upgrade" title="No hay cursos con estudiantes de este nivel para este año escolar" />}
+      {levelCourses.map((course) => {
         const courseEligible = course.students.filter((student) => student.eligible).length;
         const courseDecided = course.students.filter((student) => student.decision).length;
         const pending = course.students.length - courseDecided;
@@ -57,7 +59,7 @@ export default function Promotions() {
           <div className="p-5"><div className="grid grid-cols-3 gap-2 border-b border-slate-100 pb-5 text-center"><Stat label="Estudiantes" value={course.students.length} /><Stat label="Elegibles" value={courseEligible} /><Stat label="Pendientes" value={pending} tone={pending ? 'amber' : 'emerald'} /></div>{!course.promotionOpen && <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs leading-5 text-amber-800">{course.promotionBlockReason}</p>}<div className="mt-5 flex items-center justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Workspace del curso</p><p className="mt-1 text-xs text-slate-500">{courseDecided} decisiones registradas</p></div><button type="button" onClick={() => navigate(`/admin/promotions/${course.id}?year=${yearId}`)} className="flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-slate-800">Abrir <span aria-hidden="true" className="material-symbols-outlined text-[18px]">arrow_forward</span></button></div></div>
         </article>;
       })}
-    </section>}
+    </section>}</LevelWorkspace>}
   </>;
 }
 
