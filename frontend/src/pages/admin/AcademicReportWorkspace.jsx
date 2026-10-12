@@ -53,12 +53,12 @@ export default function AcademicReportWorkspace({ yearId, yearName }) {
       </div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-slate-500">Cada fila corresponde a una materia y período. La nota efectiva usa RP cuando existe; sin nota no significa cero.</p>
-        <button disabled={!visible.length} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold disabled:opacity-40" onClick={() => downloadCsv(`academico-${safeFilename(course.grade)}-${course.section}-${safeFilename(yearName)}`, [['Año', 'Grado', 'Sección', 'Tanda', 'Matrícula', 'Apellido', 'Nombre', 'Materia', 'Período', 'C1', 'C2', 'C3', 'Nota período', 'RP', 'Nota efectiva'], ...visible.map(r => [yearName, course.grade, course.section, course.shift, r.enrollment_no, r.last_name, r.name, r.subject, r.period, r.c1_score, r.c2_score, r.c3_score, r.period_score, r.rp_score, r.effective_score])])}>Exportar selección CSV</button>
+        <button disabled={!visible.length} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold disabled:opacity-40" onClick={() => downloadCsv(`academico-${safeFilename(course.grade)}-${course.section}-${safeFilename(yearName)}`, [['Año', 'Grado', 'Sección', 'Tanda', 'Matrícula', 'Apellido', 'Nombre', 'Materia', 'Período', 'C1', 'C2', 'C3', 'C4', 'Nota período', 'RP', 'Nota efectiva'], ...visible.map(r => [yearName, course.grade, course.section, course.shift, r.enrollment_no, r.last_name, r.name, r.subject, r.period, r.c1_score, r.c2_score, r.c3_score, r.c4_score, r.period_score, r.rp_score, r.effective_score])])}>Exportar selección CSV</button>
       </div>
       <DataTable loading={detail.isLoading} rows={visible} emptyTitle="No hay calificaciones oficiales para esta selección." columns={[
         { key: 'enrollment_no', label: 'Matrícula' }, { key: 'name', label: 'Estudiante', render: r => `${r.last_name}, ${r.name}` },
         { key: 'subject', label: 'Materia' }, { key: 'period', label: 'Período' },
-        ...['c1_score', 'c2_score', 'c3_score', 'period_score', 'rp_score'].map((key, index) => ({ key, label: ['C1', 'C2', 'C3', 'Nota período', 'RP'][index], align: 'center', render: r => score(r[key]) })),
+        ...['c1_score', 'c2_score', 'c3_score', 'c4_score', 'period_score', 'rp_score'].map((key, index) => ({ key, label: ['C1', 'C2', 'C3', 'C4', 'Nota período', 'RP'][index], align: 'center', render: r => score(r[key]) })),
         { key: 'effective_score', label: 'Nota efectiva', align: 'center', render: r => <span className={r.effective_score != null && Number(r.effective_score) < 70 ? 'font-bold text-red-600' : 'font-bold'}>{score(r.effective_score)}</span> },
       ]} />
     </>}

@@ -27,6 +27,7 @@ export default function Workspace() {
     c1: '',
     c2: '',
     c3: '',
+    c4: '',
     comment: '',
   });
 
@@ -151,6 +152,7 @@ export default function Workspace() {
       c1: student.c1_score ?? '',
       c2: student.c2_score ?? '',
       c3: student.c3_score ?? '',
+      c4: student.c4_score ?? '',
       comment: '',
     });
 
@@ -182,12 +184,13 @@ export default function Workspace() {
         ['Curso', `${gradeName} ${sectionName}`],
         ['Periodo', period?.name || ''],
         [],
-        ['Estudiante', 'C1', 'C2', 'C3', 'Nota periodo', 'RP', 'Nota final', 'Estado'],
+        ['Estudiante', 'C1', 'C2', 'C3', 'C4', 'Nota periodo', 'RP', 'Nota final', 'Estado'],
         ...studentsList.map((student) => [
           student.student_name,
           student.c1_score ?? '',
           student.c2_score ?? '',
           student.c3_score ?? '',
+          student.c4_score ?? '',
           student.period_score ?? '',
           student.rp_score ?? '',
           student.effective_score ?? '',
@@ -289,6 +292,7 @@ export default function Workspace() {
                 <th className="py-4 px-6 text-center">C1 Comunicativa</th>
                 <th className="py-4 px-6 text-center">C2 Pensamiento Lógico</th>
                 <th className="py-4 px-6 text-center">C3 Científica</th>
+                <th className="py-4 px-6 text-center">C4 Ética y desarrollo personal</th>
                 <th className="py-4 px-6 text-center">Nota Periodo</th>
                 <th className="py-4 px-6 text-center">Recup.</th>
                 <th className="py-4 px-6 text-center">Nota Final</th>
@@ -298,7 +302,7 @@ export default function Workspace() {
             <tbody className="divide-y divide-slate-100 text-sm">
               {studentsList.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-16 text-center">
+                  <td colSpan="9" className="py-16 text-center">
                     <div className="flex flex-col items-center gap-3 text-slate-400">
                       <span className="material-symbols-outlined text-[40px] text-slate-300">
                         group_off
@@ -352,6 +356,9 @@ export default function Workspace() {
 
                       <td className="py-3.5 px-6 text-center font-mono text-slate-600">
                         {student.c3_score ?? '-'}
+                      </td>
+                      <td className="py-3.5 px-6 text-center font-mono text-slate-600">
+                        {student.c4_score ?? '-'}
                       </td>
 
                       <td className="py-3.5 px-6 text-center font-mono font-bold text-slate-700">
@@ -582,7 +589,7 @@ export default function Workspace() {
                   </p>
                   <p className={`mt-1 text-xs font-semibold leading-5 ${submission.ready ? 'text-emerald-700' : 'text-amber-700'}`}>
                     {submission.ready
-                      ? `Los ${submission.total_students} estudiantes activos tienen sus tres competencias completas.`
+                      ? `Los ${submission.total_students} estudiantes activos tienen sus cuatro competencias completas.`
                       : `${submission.complete_students} de ${submission.total_students} estudiantes están completos. Completa las notas pendientes antes de enviar.`}
                   </p>
                 </div>
@@ -938,6 +945,25 @@ export default function Workspace() {
                       setDrawerForm({
                         ...drawerForm,
                         c3: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                    C4 ÉTICA Y DESARROLLO PERSONAL
+                  </label>
+
+                  <input
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-mono text-sm text-slate-800 focus:bg-white focus:ring-1 focus:ring-slate-950 focus:border-slate-950 outline-none transition-all"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={drawerForm.c4}
+                    onChange={(e) =>
+                      setDrawerForm({
+                        ...drawerForm,
+                        c4: e.target.value,
                       })
                     }
                   />

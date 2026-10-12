@@ -7,6 +7,8 @@ import { getCurrentPeriod } from '../../api/periods.api';
 import DashboardLayout from '../../components/DashboardLayout';
 import usePeriodStore from '../../store/periodStore';
 
+import { COMPETENCY_KEYS, competencyId, activityAverage } from '../../utils/competencies';
+
 export default function ActivityGrades() {
   const { sectionId, subjectId, activityId } = useParams();
   const queryClient = useQueryClient();
@@ -109,7 +111,7 @@ export default function ActivityGrades() {
     const payload = {
       activity_id: Number(activityId),
       student_id: studentId,
-      competency_id: key === 'c1' ? 1 : key === 'c2' ? 2 : 3,
+      competency_id: competencyId(key),
       period_id: period?.id,
       subject_id: Number(subjectId),
       score: value === '' || value === null || value === undefined ? null : Number(value),
@@ -270,18 +272,14 @@ export default function ActivityGrades() {
   }, [saveAll]);
 
   // Derived stats (live — recalculated from localScores)
-  const calcTotal = (c1, c2, c3) => {
-    const vals = [c1, c2, c3].filter(v => v !== '' && v !== null && v !== undefined && !isNaN(Number(v)));
-    if (vals.length === 0) return null;
-    return vals.reduce((a, b) => a + Number(b), 0) / vals.length;
-  };
+  const calcTotal = activityAverage;
 
   const numericTotals = localScores
-    .map(s => calcTotal(s.c1, s.c2, s.c3))
+    .map(s => calcTotal(s.c1, s.c2, s.c3, s.c4))
     .filter(t => t !== null);
 
   const hasScore = (value) => value !== '' && value !== null && value !== undefined && !Number.isNaN(Number(value));
-  const isComplete = (student) => ['c1', 'c2', 'c3'].every((key) => hasScore(student[key]));
+  const isComplete = (student) => COMPETENCY_KEYS.every((key) => hasScore(student[key]));
   const normalizeSearch = (value) => String(value ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -289,7 +287,7 @@ export default function ActivityGrades() {
     .trim();
   const searchNeedle = normalizeSearch(studentSearch);
   const filteredScores = localScores.filter((student) => {
-    const total = calcTotal(student.c1, student.c2, student.c3);
+    const total = calcTotal(student.c1, student.c2, student.c3, student.c4);
     const matchesSearch = !searchNeedle || normalizeSearch(
       `${student.student_name} ${student.enrollment_no ?? ''}`
     ).includes(searchNeedle);
@@ -308,7 +306,7 @@ export default function ActivityGrades() {
       key: 'risk',
       label: 'En riesgo',
       count: localScores.filter((student) => {
-        const total = calcTotal(student.c1, student.c2, student.c3);
+        const total = calcTotal(student.c1, student.c2, student.c3, student.c4);
         return total !== null && total < 70;
       }).length,
     },
@@ -532,6 +530,7 @@ export default function ActivityGrades() {
       </section>
 
       {/* Grade entry table */}
+      <p className="mb-3 text-xs text-slate-500">Cada actividad requiere C1, C2, C3 y C4. El total es su promedio con igual peso (25% cada una). Puedes guardar el progreso; mientras falte una nota, el total queda pendiente.</p>
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm mb-6">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -542,6 +541,7 @@ export default function ActivityGrades() {
                 <th className="py-4 px-4 text-center w-32">C1 Comunicativa</th>
                 <th className="py-4 px-4 text-center w-36">C2 Pensamiento Lógico</th>
                 <th className="py-4 px-4 text-center w-32">C3 Científica</th>
+                <th className="py-4 px-4 text-center w-44">C4 Ética y ciudadanía + Desarrollo personal y espiritual</th>
                 <th className="py-4 px-4 text-center w-28 bg-slate-100/30">Total</th>
                 <th className="py-4 px-6 text-center w-24">Estado</th>
               </tr>
@@ -550,7 +550,7 @@ export default function ActivityGrades() {
 
               {localScores.length === 0 && (
                 <tr>
-                  <td colSpan="7" className="py-14 text-center text-slate-400 text-xs font-semibold">
+                  <td colSpan="8" className="py-14 text-center text-slate-400 text-xs font-semibold">
                     {isLoadingActivityGrades
                       ? 'Cargando estudiantes...'
                       : period
@@ -562,17 +562,17 @@ export default function ActivityGrades() {
 
               {localScores.length > 0 && filteredScores.length === 0 && (
                 <tr>
-                  <td colSpan="7" className="py-14 text-center text-slate-400 text-xs font-semibold">
+                  <td colSpan="8" className="py-14 text-center text-slate-400 text-xs font-semibold">
                     No se encontraron estudiantes que coincidan con la búsqueda o el filtro.
                   </td>
                 </tr>
               )}
 
               {filteredScores.map((student) => {
-                const rawTotal  = calcTotal(student.c1, student.c2, student.c3);
+                const rawTotal  = calcTotal(student.c1, student.c2, student.c3, student.c4);
                 const totalDisp = rawTotal !== null ? rawTotal.toFixed(1) : '--';
                 const isRisk    = rawTotal !== null && rawTotal < 70;
-                const cellStatuses = ['c1', 'c2', 'c3'].map(
+                const cellStatuses = COMPETENCY_KEYS.map(
                   key => syncStatus[`${saveScope}:${student.student_id}:${key}`]
                 );
                 const status = cellStatuses.includes('sync')
@@ -598,9 +598,10 @@ export default function ActivityGrades() {
                       <span className="font-mono text-[10px] text-slate-400">{student.enrollment_no ?? '—'}</span>
                     </td>
 
-                    {['c1', 'c2', 'c3'].map((key) => (
+                    {COMPETENCY_KEYS.map((key) => (
                       <td key={key} className="py-3.5 px-4 text-center">
                         <input
+                          aria-label={`${key.toUpperCase()} de ${student.student_name}`}
                           type="number"
                           min="0"
                           max="100"

@@ -123,7 +123,7 @@ export default function System() {
             <EntityCounts title="Se eliminará" rows={preview.delete} danger />
             <EntityCounts title="Se conservará" rows={preview.preserve} />
           </div>
-          <p className="text-sm leading-6 text-slate-600">También se limpia el historial académico. Se conservan las competencias C1–C3 y el catálogo de actividades base, incluidas las seis fijas con sus mismos identificadores. Solo se eliminan las actividades de los cursos y sus calificaciones. No se borran tablas, vistas, relaciones ni migraciones.</p>
+          <p className="text-sm leading-6 text-slate-600">También se limpia el historial académico. Se conservan las competencias C1–C4 y el catálogo de actividades base, incluidas las seis fijas con sus mismos identificadores. Solo se eliminan las actividades de los cursos y sus calificaciones. No se borran tablas, vistas, relaciones ni migraciones.</p>
           <label className="flex items-start gap-3 text-sm text-slate-700">
             <input type="checkbox" className="mt-1 h-4 w-4 accent-red-700" checked={backupAcknowledged} onChange={e => setBackupAcknowledged(e.target.checked)} />
             Entiendo que esta acción afecta todos los años, es irreversible desde la aplicación y requiere un respaldo externo verificado.

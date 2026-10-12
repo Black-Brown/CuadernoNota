@@ -295,8 +295,8 @@ class GradeController extends Controller
      * Registra la nota de una actividad para un estudiante.
      *
      * Después de guardar la nota, recalcula automáticamente:
-     *  - La nota de cada competencia (C1, C2, C3) para ese período.
-     *  - La nota del período = (C1+C2+C3)/3.
+     *  - La nota de cada competencia (C1, C2, C3, C4) para ese período.
+     *  - La nota del período = (C1+C2+C3+C4)/4.
      *
      * Devuelve el PeriodGrade actualizado, o null si alguna competencia
      * aún no tiene actividades con nota registrada.
@@ -306,7 +306,7 @@ class GradeController extends Controller
         $validated = $request->validate([
             'activity_id'   => 'required|integer|exists:activities,id',
             'student_id'    => 'required|integer|exists:students,id',
-            'competency_id' => 'required|integer|exists:competencies,id',
+            'competency_id' => 'required|integer|in:1,2,3,4|exists:competencies,id',
             'period_id'     => 'required|integer|exists:periods,id',
             'subject_id'    => 'required|integer|exists:subjects,id',
             'score'         => 'nullable|numeric|min:0|max:100',
@@ -358,9 +358,11 @@ class GradeController extends Controller
             ], 423);
         }
 
-        $periodGrade = DB::transaction(
-            fn () => $this->registerActivityScore->execute($validated)
-        );
+        $periodGrade = DB::transaction(function () use ($validated) {
+            // Concurrent autosaves of different competencies must recalculate in order.
+            DB::table('students')->where('id', $validated['student_id'])->lockForUpdate()->first();
+            return $this->registerActivityScore->execute($validated);
+        });
 
         if ($periodGrade === null) {
             return response()->json([
@@ -378,6 +380,7 @@ class GradeController extends Controller
                 'c1_score'        => $periodGrade->c1Score,
                 'c2_score'        => $periodGrade->c2Score,
                 'c3_score'        => $periodGrade->c3Score,
+                'c4_score'        => $periodGrade->c4Score,
                 'period_score'    => $periodGrade->periodScore,
                 'rp_score'        => $periodGrade->rpScore,
                 'effective_score' => $periodGrade->effectiveScore(),

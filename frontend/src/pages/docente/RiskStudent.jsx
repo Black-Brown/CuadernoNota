@@ -163,12 +163,13 @@ export default function RiskStudent() {
       ]),
       [],
       ['Actividades'],
-      ['Actividad', 'C1', 'C2', 'C3'],
+      ['Actividad', 'C1', 'C2', 'C3', 'C4'],
       ...performance.map((activity) => [
         activity.activity_name,
         activity.c1 ?? '',
         activity.c2 ?? '',
         activity.c3 ?? '',
+        activity.c4 ?? '',
       ]),
       [],
       ['Alertas'],
@@ -284,13 +285,14 @@ export default function RiskStudent() {
                           <th className="px-4 py-3 text-center">C1</th>
                           <th className="px-4 py-3 text-center">C2</th>
                           <th className="px-4 py-3 text-center">C3</th>
+                          <th className="px-4 py-3 text-center">C4</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-sm">
                         {performance.map((activity) => (
                           <tr key={activity.activity_id} className="hover:bg-slate-50">
                             <td className="px-4 py-3 font-bold text-slate-800">{activity.activity_name}</td>
-                            {['c1', 'c2', 'c3'].map((key) => (
+                            {['c1', 'c2', 'c3', 'c4'].map((key) => (
                               <td key={key} className={`px-4 py-3 text-center font-mono font-bold ${scoreClass(activity[key])}`}>
                                 {activity[key] ?? '--'}
                               </td>

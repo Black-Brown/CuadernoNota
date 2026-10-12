@@ -16,11 +16,11 @@ use App\Domain\Grade\Repositories\ActivityScoreRepositoryInterface;
  * Flujo:
  *  1. Persiste la nota de la actividad vía ActivityScoreRepository.
  *  2. Recupera todas las notas del estudiante en esa asignatura/período.
- *  3. Paso 1 — Recalcula C1, C2 y C3 con CompetencyCalculator.
+ *  3. Paso 1 — Recalcula C1, C2, C3 y C4 con CompetencyCalculator.
  *  4. Paso 2 — Recalcula la nota del período con GradeCalculator.
  *  5. Actualiza (upsert) el PeriodGrade correspondiente.
  *
- * Si alguna de las tres competencias no tiene actividades con nota,
+ * Si alguna de las cuatro competencias no tiene actividades con nota,
  * el Paso 2 no se puede ejecutar. En ese caso se elimina cualquier
  * PeriodGrade anterior para no conservar cálculos desactualizados.
  */
@@ -44,7 +44,7 @@ class RegisterActivityScore
      *                          - subject_id  (int)
      *                          - period_id   (int, 1-4)
      *                          - activity_id (int)
-     *                          - competency_id (int, 1=C1, 2=C2, 3=C3)
+     *                          - competency_id (int, 1=C1, 2=C2, 3=C3, 4=C4)
      *                          - score       (float|null)
      *
      * @return PeriodGrade|null PeriodGrade actualizado, o NULL si alguna

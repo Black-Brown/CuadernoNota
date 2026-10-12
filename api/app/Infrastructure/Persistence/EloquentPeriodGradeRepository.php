@@ -27,6 +27,7 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
                 'c1_score'     => $periodGrade->c1Score,
                 'c2_score'     => $periodGrade->c2Score,
                 'c3_score'     => $periodGrade->c3Score,
+                'c4_score'     => $periodGrade->c4Score,
                 'period_score' => $periodGrade->periodScore,
                 'rp_score'     => $periodGrade->rpScore,
                 'status'       => $periodGrade->status,
@@ -117,6 +118,7 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
                     || $grade->c1_score === null
                     || $grade->c2_score === null
                     || $grade->c3_score === null
+                    || $grade->c4_score === null
                     || $grade->period_score === null;
             })
             ->map(fn (StudentModel $student): array => [
@@ -180,6 +182,7 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
             'c1_score'       => $g->c1_score,
             'c2_score'       => $g->c2_score,
             'c3_score'       => $g->c3_score,
+            'c4_score'       => $g->c4_score,
             'period_score'   => $g->period_score,
             'rp_score'       => $g->rp_score,
             'effective_score' => $g->rp_score ?? $g->period_score,
@@ -245,6 +248,7 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
                     'c1_score'        => $grade?->c1_score,
                     'c2_score'        => $grade?->c2_score,
                     'c3_score'        => $grade?->c3_score,
+                    'c4_score'        => $grade?->c4_score,
                     'period_score'    => $grade?->period_score,
                     'rp_score'        => $grade?->rp_score,
                     'effective_score' => $effectiveScore,
@@ -333,6 +337,7 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
             c1Score:     (float) ($model->c1_score ?? 0),
             c2Score:     (float) ($model->c2_score ?? 0),
             c3Score:     (float) ($model->c3_score ?? 0),
+            c4Score:     $model->c4_score !== null ? (float) $model->c4_score : null,
             periodScore: (float) ($model->period_score ?? 0),
             rpScore:     $model->rp_score !== null ? (float) $model->rp_score : null,
             status:      $model->status,

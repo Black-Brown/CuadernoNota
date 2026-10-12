@@ -151,8 +151,8 @@ class ResetSystemData
             $this->schema->fail('Hay trabajos pendientes. Detén los workers y revisa la cola antes de restablecer.');
         }
         $competencies = DB::table('competencies')->orderBy('id')->pluck('code', 'id')->all();
-        if ($competencies !== [] && $competencies !== [1 => 'C1', 2 => 'C2', 3 => 'C3']) {
-            $this->schema->fail('El catálogo de competencias no coincide con C1–C3 y necesita revisión.');
+        if ($competencies !== [] && $competencies !== [1 => 'C1', 2 => 'C2', 3 => 'C3', 4 => 'C4']) {
+            $this->schema->fail('El catálogo de competencias no coincide con C1–C4 y necesita revisión.');
         }
     }
 

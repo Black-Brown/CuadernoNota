@@ -38,7 +38,7 @@ class ResetDataSchema
         'audit_logs' => 'Auditoría histórica (se añadirá el restablecimiento)',
         'cache' => 'Caché técnica y autenticación Google',
         'cache_locks' => 'Bloqueos técnicos',
-        'competencies' => 'Configuración fija C1, C2 y C3',
+        'competencies' => 'Configuración fija C1, C2, C3 y C4',
         'failed_jobs' => 'Registro técnico de trabajos fallidos',
         'job_batches' => 'Registro técnico de lotes de trabajos',
         'jobs' => 'Cola técnica de trabajos',

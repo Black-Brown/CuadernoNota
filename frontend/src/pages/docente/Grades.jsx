@@ -51,6 +51,11 @@ const competencies = [
     icon: 'science',
     iconTone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   },
+  {
+    key: 'c4_score', shortLabel: 'C4', label: 'Ética y ciudadanía',
+    secondary: 'Desarrollo personal y espiritual', icon: 'diversity_3',
+    iconTone: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+  },
 ];
 
 function CourseSelection({ courses, isLoading }) {
@@ -212,6 +217,7 @@ function GradebookView({ course }) {
       'Final C1',
       'Final C2',
       'Final C3',
+      'Final C4',
       'Estado',
     ];
 
@@ -312,7 +318,7 @@ function GradebookView({ course }) {
               <span className="material-symbols-outlined text-[20px] text-indigo-500">view_week</span>
               <h2 className="text-base font-extrabold text-slate-800">Resumen anual de notas</h2>
             </div>
-            <p className="text-xs text-slate-400 mt-1">P = período, RP = recuperación pedagógica, C1/C2/C3 = calificación final por competencia.</p>
+            <p className="text-xs text-slate-400 mt-1">P = período, RP = recuperación pedagógica, C1/C2/C3/C4 = calificación final por competencia.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {competencies.map((competency) => (
@@ -362,6 +368,7 @@ function GradebookView({ course }) {
                 <col className="w-12" />
                 <col className="w-12" />
                 <col className="w-12" />
+                <col className="w-12" />
                 <col className="w-28" />
               </colgroup>
               <thead>
@@ -385,7 +392,7 @@ function GradebookView({ course }) {
                       </div>
                     </th>
                   ))}
-                  <th colSpan="3" className="border-b border-r border-slate-200 bg-slate-100 px-3 py-3 text-center text-[10px] leading-tight text-slate-700">
+                  <th colSpan={competencies.length} className="border-b border-r border-slate-200 bg-slate-100 px-3 py-3 text-center text-[10px] leading-tight text-slate-700">
                     Calificacion final por competencia
                   </th>
                   <th rowSpan="2" className="border-b border-slate-200 bg-white px-2 py-3 text-center">
@@ -406,12 +413,13 @@ function GradebookView({ course }) {
                   <th className="border-b border-r border-slate-200 bg-slate-100 px-1 py-2 text-center text-slate-700">C1</th>
                   <th className="border-b border-r border-slate-200 bg-slate-100 px-1 py-2 text-center text-slate-700">C2</th>
                   <th className="border-b border-r border-slate-200 bg-slate-100 px-1 py-2 text-center text-slate-700">C3</th>
+                  <th className="border-b border-r border-slate-200 bg-slate-100 px-1 py-2 text-center text-slate-700">C4</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
                 {students.length === 0 ? (
                   <tr>
-                    <td colSpan="29" className="py-16 text-center text-slate-400">
+                    <td colSpan={2 + competencies.length * 9} className="py-16 text-center text-slate-400">
                       <span className="material-symbols-outlined text-[40px]">table_rows_narrow</span>
                       <p className="text-sm font-semibold mt-2">No hay calificaciones calculadas para este curso.</p>
                     </td>

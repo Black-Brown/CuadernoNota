@@ -11,7 +11,7 @@ class PeriodGrade extends Model
 
     protected $fillable = [
         'student_id', 'section_id', 'subject_id', 'period_id',
-        'c1_score', 'c2_score', 'c3_score',
+        'c1_score', 'c2_score', 'c3_score', 'c4_score',
         'period_score', 'rp_score',
         'status', 'approved_at', 'approved_by',
     ];
@@ -20,6 +20,7 @@ class PeriodGrade extends Model
         'c1_score'     => 'float',
         'c2_score'     => 'float',
         'c3_score'     => 'float',
+        'c4_score'     => 'float',
         'period_score' => 'float',
         'rp_score'     => 'float',
         'approved_at'  => 'datetime',

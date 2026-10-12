@@ -6,8 +6,8 @@ namespace App\Domain\Grade\Entities;
  * Entidad que representa la calificación de un estudiante
  * en una asignatura durante un período académico.
  *
- * Contiene las notas calculadas de las 3 competencias (C1, C2, C3),
- * la nota del período (period_score = promedio de C1+C2+C3),
+ * Contiene las notas calculadas de las 4 competencias (C1, C2, C3, C4),
+ * la nota del período (period_score = promedio de C1+C2+C3+C4),
  * y opcionalmente una Recuperación Pedagógica (rp_score).
  *
  * Esta entidad es el resultado del Paso 2 automático del sistema.
@@ -22,7 +22,8 @@ class PeriodGrade
      * @param float                 $c1Score      Nota de C1 (Comunicativa) — promedio de actividades con nota
      * @param float                 $c2Score      Nota de C2 (Pensamiento Lógico) — promedio de actividades con nota
      * @param float                 $c3Score      Nota de C3 (Científica) — promedio de actividades con nota
-     * @param float                 $periodScore  Nota del período = (C1 + C2 + C3) / 3. Es P1, P2, P3 o P4 en el boletín
+     * @param float|null            $c4Score      Nota de C4; null únicamente para registros anteriores sin completar
+     * @param float                 $periodScore  Nota del período = (C1 + C2 + C3 + C4) / 4. Es P1, P2, P3 o P4 en el boletín
      * @param float|null            $rpScore      Recuperación Pedagógica. Si existe, sustituye a periodScore en el CF. NULL si no aplica
      * @param string                $status       Estado: draft | in_review | official
      */
@@ -38,6 +39,7 @@ class PeriodGrade
         public readonly ?float $rpScore = null,
         public readonly string $status = 'draft',
         public readonly ?int   $sectionId = null,
+        public readonly ?float $c4Score = null,
     ) {}
 
     /**

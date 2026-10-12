@@ -54,8 +54,9 @@ class EloquentActivityScoreRepository implements ActivityScoreRepositoryInterfac
             ->where('subject_id', $subjectId)
             ->where('period_id', $periodId)
             ->whereHas('activity', fn ($query) => $query->where('status', 'active'))
-            ->get(['competency_id', 'score'])
+            ->get(['activity_id', 'competency_id', 'score'])
             ->map(fn($m) => [
+                'activity_id' => (int) $m->activity_id,
                 'competency_id' => (int) $m->competency_id,
                 'score'         => $m->score !== null ? (float) $m->score : null,
             ])
@@ -116,6 +117,9 @@ class EloquentActivityScoreRepository implements ActivityScoreRepositoryInterfac
                 : null,
             'c3'            => isset($scores[$student->id])
                 ? optional($scores[$student->id]->firstWhere('competency_id', 3))->score
+                : null,
+            'c4'            => isset($scores[$student->id])
+                ? optional($scores[$student->id]->firstWhere('competency_id', 4))->score
                 : null,
         ])->all();
     }

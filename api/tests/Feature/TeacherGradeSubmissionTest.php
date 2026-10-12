@@ -84,6 +84,19 @@ class TeacherGradeSubmissionTest extends TestCase
         ]);
     }
 
+    public function test_legacy_draft_without_c4_cannot_be_submitted(): void
+    {
+        $context = $this->academicContext();
+        $this->completeGrade($context['student_a'], $context);
+        $this->completeGrade($context['student_b'], $context);
+        DB::table('period_grades')->where('student_id', $context['student_a'])->update(['c4_score' => null]);
+        Sanctum::actingAs($context['teacher']);
+        Carbon::setTestNow('2026-09-05 12:00:00');
+        $this->postJson('/api/docente/grades/submit', $this->submitPayload($context))
+            ->assertUnprocessable()->assertJsonPath('submission.pending_students', 1);
+        $this->assertDatabaseHas('period_grades', ['student_id' => $context['student_a'], 'status' => 'draft', 'period_score' => 85]);
+    }
+
     private function submitPayload(array $context): array
     {
         return [
@@ -103,6 +116,7 @@ class TeacherGradeSubmissionTest extends TestCase
             'c1_score' => 80,
             'c2_score' => 85,
             'c3_score' => 90,
+            'c4_score' => 85,
             'period_score' => 85,
             'rp_score' => null,
             'status' => 'draft',

@@ -63,6 +63,8 @@ class TeacherHighRiskGuardrailsTest extends TestCase
 
     public function test_future_open_period_is_upcoming_and_blocks_teacher_operations_until_start_date(): void
     {
+        $this->travelTo(\Carbon\Carbon::parse('2026-09-05 12:00:00'));
+        $this->beforeApplicationDestroyed(fn () => $this->travelBack());
         $context = $this->academicContext();
         DB::table('periods')->where('academic_year_id', $context['year_id'])->update([
             'start_date' => '2026-10-01', 'end_date' => '2026-11-30', 'status' => 'open',

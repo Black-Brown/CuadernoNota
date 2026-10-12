@@ -5,7 +5,7 @@ namespace App\Domain\Grade\Services;
 /**
  * Servicio de dominio responsable del Paso 1 del sistema de evaluación.
  *
- * Calcula la nota de una competencia (C1, C2 o C3) a partir de las
+ * Calcula la nota de una competencia (C1, C2, C3 o C4) a partir de las
  * notas de actividades registradas por el docente.
  *
  * Regla de negocio: solo se promedian las actividades que tienen
@@ -23,7 +23,7 @@ class CompetencyCalculator
      * @param array $scores Array de notas de actividades. Cada elemento
      *                       debe tener la forma:
      *                       ['competency_id' => int, 'score' => float|null]
-     * @param int   $competencyId ID de la competencia a calcular: 1=C1, 2=C2, 3=C3
+     * @param int   $competencyId ID de la competencia a calcular: 1=C1, 2=C2, 3=C3, 4=C4
      *
      * @return float|null Promedio de las actividades con nota (0-100),
      *                     redondeado a 2 decimales. Devuelve NULL si

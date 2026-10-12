@@ -78,6 +78,7 @@ class RegisterRecovery
             c1Score:     $existing->c1Score,
             c2Score:     $existing->c2Score,
             c3Score:     $existing->c3Score,
+            c4Score:     $existing->c4Score,
             periodScore: $existing->periodScore,
             rpScore:     $rpScore,
             status:      $existing->status,
