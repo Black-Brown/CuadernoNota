@@ -31,7 +31,7 @@ interface ActivityScoreRepositoryInterface
      * Obtiene todas las notas de actividades de un estudiante
      * para una asignatura en un período específico.
      *
-     * Se usa para recalcular C1, C2, C3 y period_score (Paso 2)
+     * Se usa para recalcular C1, C2, C3, C4 y period_score (Paso 2)
      * cada vez que se guarda una nueva nota.
      *
      * @param int $studentId ID del estudiante
@@ -39,7 +39,7 @@ interface ActivityScoreRepositoryInterface
      * @param int $periodId  ID del período académico
      *
      * @return array Array de notas con la forma:
-     *                [['competency_id' => int, 'score' => float|null], ...]
+     *                [['activity_id' => int, 'competency_id' => int, 'score' => float|null], ...]
      */
     public function findByStudentSubjectPeriod(
         int $studentId,
@@ -57,10 +57,10 @@ interface ActivityScoreRepositoryInterface
 
     /**
      * Devuelve TODOS los estudiantes de la sección correspondiente a una
-     * actividad, con sus notas C1, C2 y C3 para esa actividad y período.
+     * actividad, con sus notas C1, C2, C3 y C4 para esa actividad y período.
      * Los estudiantes sin nota registrada aparecen con null en cada campo.
      *
-     * @return array [['student_id', 'student_name', 'c1', 'c2', 'c3'], ...]
+     * @return array [['student_id', 'student_name', 'c1', 'c2', 'c3', 'c4'], ...]
      */
     public function findStudentScoresByActivity(int $activityId, int $periodId, ?int $sectionId = null): array;
 }

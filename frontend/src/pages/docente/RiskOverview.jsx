@@ -92,7 +92,7 @@ export default function RiskOverview() {
       value: summary.competency_alerts ?? 0,
       icon: 'psychology',
       tone: 'bg-cyan-50 text-cyan-700',
-      note: 'C1, C2 o C3 por debajo de 70',
+      note: 'C1, C2, C3 o C4 por debajo de 70',
     },
   ], [summary]);
 

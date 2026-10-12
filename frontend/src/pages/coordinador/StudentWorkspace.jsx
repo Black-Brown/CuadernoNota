@@ -69,7 +69,7 @@ function StudentDetail({ sectionId, student, periodId, onClose }) {
         <button key={key} onClick={() => setTab(key)} aria-pressed={tab === key} className={`rounded-lg px-4 py-2 text-xs font-bold ${tab === key ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-600'}`}>{label}</button>)}</div>
       {tab === 'grades' && <DataTable rows={data?.grades} loading={isLoading} emptyTitle="Sin notas en este período" columns={[
         { key: 'subject_name', label: 'Materia' },
-        ...['c1_score', 'c2_score', 'c3_score'].map((key, index) => ({ key, label: `C${index + 1}`, render: r => r[key] ?? '—' })),
+        ...['c1_score', 'c2_score', 'c3_score', 'c4_score'].map((key, index) => ({ key, label: `C${index + 1}`, render: r => r[key] ?? '—' })),
         { key: 'period_score', label: 'Período', render: r => r.period_score ?? '—' },
         { key: 'rp_score', label: 'RP', render: r => r.rp_score ?? '—' },
         { key: 'status', label: 'Estado', render: r => states[r.status] ?? r.status },

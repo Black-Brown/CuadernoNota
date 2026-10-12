@@ -237,6 +237,7 @@ class RiskController extends Controller
             'c1' => $periodGrade?->c1_score !== null ? (float) $periodGrade->c1_score : null,
             'c2' => $periodGrade?->c2_score !== null ? (float) $periodGrade->c2_score : null,
             'c3' => $periodGrade?->c3_score !== null ? (float) $periodGrade->c3_score : null,
+            'c4' => $periodGrade?->c4_score !== null ? (float) $periodGrade->c4_score : null,
         ];
 
         $attendancePct = $this->studentAttendancePercentage((int) $student->id, $subjectId, $periodId);
@@ -294,7 +295,7 @@ class RiskController extends Controller
             ->groupBy('id')
             ->map(function (Collection $scores): array {
                 $first = $scores->first();
-                $competencies = ['C1' => null, 'C2' => null, 'C3' => null];
+                $competencies = ['C1' => null, 'C2' => null, 'C3' => null, 'C4' => null];
 
                 foreach ($scores as $score) {
                     $competencies[strtoupper($score->code)] = $score->score !== null ? (float) $score->score : null;
@@ -306,6 +307,7 @@ class RiskController extends Controller
                     'c1' => $competencies['C1'],
                     'c2' => $competencies['C2'],
                     'c3' => $competencies['C3'],
+                    'c4' => $competencies['C4'],
                 ];
             })
             ->values()
@@ -321,12 +323,12 @@ class RiskController extends Controller
             ->first();
 
         $competencies = DB::table('competencies')
-            ->whereIn('code', ['C1', 'C2', 'C3'])
+            ->whereIn('code', ['C1', 'C2', 'C3', 'C4'])
             ->orderBy('code')
             ->get()
             ->keyBy('code');
 
-        return collect(['C1' => 'c1_score', 'C2' => 'c2_score', 'C3' => 'c3_score'])
+        return collect(['C1' => 'c1_score', 'C2' => 'c2_score', 'C3' => 'c3_score', 'C4' => 'c4_score'])
             ->map(function (string $column, string $code) use ($periodGrade, $competencies, $studentId, $subjectId, $periodId): array {
                 $average = $periodGrade?->{$column} !== null ? (float) $periodGrade->{$column} : null;
                 $weakest = $this->weakestActivity($studentId, $subjectId, $periodId, $code);

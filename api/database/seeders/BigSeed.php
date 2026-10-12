@@ -388,13 +388,14 @@ class BigSeed extends Seeder
 
             foreach ($studentMap[$sk] as $idx => $studId) {
                 [$c1, $c2, $c3] = $this->scorePatterns[$idx % count($this->scorePatterns)];
-                $ps = round(($c1 + $c2 + $c3) / 3, 2);
+                $c4 = $c3;
+                $ps = round(($c1 + $c2 + $c3 + $c4) / 4, 2);
                 $rp = $ps < 70 ? min(74.0, round($ps + rand(5, 14), 2)) : null;
 
                 DB::table('period_grades')->updateOrInsert(
                     ['student_id' => $studId, 'subject_id' => $subId, 'period_id' => $p1],
                     ['section_id' => DB::table('students')->where('id', $studId)->value('section_id'),
-                        'c1_score' => $c1, 'c2_score' => $c2, 'c3_score' => $c3,
+                        'c1_score' => $c1, 'c2_score' => $c2, 'c3_score' => $c3, 'c4_score' => $c4,
                         'period_score' => $ps, 'rp_score' => $rp, 'status' => 'official',
                         'created_at' => now(), 'updated_at' => now()]
                 );
@@ -414,7 +415,7 @@ class BigSeed extends Seeder
         ];
 
         $p1 = $periodIds[1];
-        // Seed scores for "Proyectos" and "Examen" activities (competencies 1, 2, 3)
+        // Seed scores for "Proyectos" and "Examen" activities (competencies 1, 2, 3, 4)
         $targetActivities = ['Proyectos', 'Examen'];
 
         foreach ($courseMap as $sk => $subCode) {
@@ -431,7 +432,7 @@ class BigSeed extends Seeder
 
                 foreach ($studentMap[$sk] as $idx => $studId) {
                     [$c1, $c2, $c3] = $this->scorePatterns[$idx % count($this->scorePatterns)];
-                    $scores = [1 => $c1, 2 => $c2, 3 => $c3];
+                    $scores = [1 => $c1, 2 => $c2, 3 => $c3, 4 => $c3];
 
                     foreach ($scores as $compId => $score) {
                         $exists = DB::table('activity_scores')

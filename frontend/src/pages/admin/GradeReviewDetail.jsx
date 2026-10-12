@@ -87,6 +87,7 @@ export default function GradeReviewDetail({
           { key: 'c1_score', label: 'C1', align: 'center', render: (r) => r.c1_score ?? '—' },
           { key: 'c2_score', label: 'C2', align: 'center', render: (r) => r.c2_score ?? '—' },
           { key: 'c3_score', label: 'C3', align: 'center', render: (r) => r.c3_score ?? '—' },
+          { key: 'c4_score', label: 'C4', align: 'center', render: (r) => r.c4_score ?? '—' },
           { key: 'period_score', label: 'Nota del período', align: 'center', render: (r) => <span className={scoreClass(r.period_score)}>{r.period_score ?? '—'}</span> },
           { key: 'rp_score', label: 'Recuperación', align: 'center', render: (r) => <span className={scoreClass(r.rp_score)}>{r.rp_score ?? '—'}</span> },
           { key: 'status', label: 'Estado', align: 'center', render: (r) => <StatusBadge tone={STATUS_META[r.status]?.tone || 'neutral'} label={STATUS_META[r.status]?.label || r.status} /> },

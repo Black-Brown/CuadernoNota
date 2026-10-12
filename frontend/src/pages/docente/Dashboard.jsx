@@ -9,7 +9,7 @@ import usePeriodStore from '../../store/periodStore';
 
 const processSteps = [
   { label: 'Planificar', icon: 'event_note', desc: 'Define actividades por curso y período.' },
-  { label: 'Evaluar', icon: 'edit_square', desc: 'Registra C1, C2 y C3 por actividad.' },
+  { label: 'Evaluar', icon: 'edit_square', desc: 'Registra C1, C2, C3 y C4 por actividad.' },
   { label: 'Recuperar', icon: 'published_with_changes', desc: 'Aplica RP si el período lo requiere.' },
   { label: 'Enviar', icon: 'task_alt', desc: 'Manda el workspace a revisión.' },
 ];

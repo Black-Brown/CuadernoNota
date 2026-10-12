@@ -8,7 +8,7 @@ use App\Domain\Grade\Entities\PeriodGrade;
  * Contrato del repositorio de notas calculadas por período.
  *
  * Corresponde a la tabla period_grades — el resultado del
- * Paso 2 automático (C1, C2, C3 y period_score).
+ * Paso 2 automático (C1, C2, C3, C4 y period_score).
  */
 interface PeriodGradeRepositoryInterface
 {
@@ -18,7 +18,7 @@ interface PeriodGradeRepositoryInterface
      *
      * La unicidad se determina por: student_id + subject_id + period_id.
      * Si ya existe un registro, se actualizan c1_score, c2_score,
-     * c3_score y period_score con los nuevos valores calculados.
+     * c3_score, c4_score y period_score con los nuevos valores calculados.
      *
      * @param PeriodGrade $periodGrade Entidad con los valores calculados
      *
@@ -45,7 +45,7 @@ interface PeriodGradeRepositoryInterface
 
     /**
      * Elimina el resumen calculado de un estudiante cuando sus notas de
-     * actividades ya no permiten calcular las tres competencias del período.
+     * actividades ya no permiten calcular las cuatro competencias del período.
      */
     public function deleteByStudentSubjectPeriod(
         int $studentId,
@@ -127,7 +127,7 @@ interface PeriodGradeRepositoryInterface
      *
      * Se usa en la pantalla "Notas Final de Periodo" (Track A, solo lectura).
      *
-     * @return array [['student_id', 'student_name', 'c1_score', 'c2_score', 'c3_score', 'period_score', 'rp_score', 'effective_score', 'status'], ...]
+     * @return array [['student_id', 'student_name', 'c1_score', 'c2_score', 'c3_score', 'c4_score', 'period_score', 'rp_score', 'effective_score', 'status'], ...]
      */
     public function findAllBySubjectPeriod(int $subjectId, int $periodId, ?int $sectionId = null): array;
 

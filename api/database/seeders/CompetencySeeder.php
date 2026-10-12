@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 class CompetencySeeder extends Seeder
 {
     /**
-     * Inserta las 3 competencias fijas del sistema.
+     * Inserta las 4 competencias fijas del sistema.
      * Usa updateOrCreate por id para que sea idempotente
      * (se puede correr múltiples veces sin duplicar datos).
      */
@@ -29,6 +29,11 @@ class CompetencySeeder extends Seeder
                 'id'   => 3,
                 'code' => 'C3',
                 'name' => 'Científica y Tecnológica + Ambiental y de la Salud',
+            ],
+            [
+                'id' => 4,
+                'code' => 'C4',
+                'name' => 'Ética y ciudadanía + Desarrollo personal y espiritual',
             ],
         ];
 

@@ -78,11 +78,11 @@ class ReportController extends Controller
             ->where('pg.section_id', $sectionId)->where('periods.academic_year_id', $data['academic_year_id'])
             ->where('pg.status', 'official')
             ->select('pg.id', 'pg.student_id', 'pg.subject_id', 'pg.period_id', 's.name', 's.last_name', 's.enrollment_no',
-                'subjects.name as subject', 'periods.name as period', 'pg.c1_score', 'pg.c2_score', 'pg.c3_score',
+                'subjects.name as subject', 'periods.name as period', 'pg.c1_score', 'pg.c2_score', 'pg.c3_score', 'pg.c4_score',
                 'pg.period_score', 'pg.rp_score', DB::raw('COALESCE(pg.rp_score, pg.period_score) as effective_score'))
             ->orderBy('s.last_name')->orderBy('s.name')->orderBy('subjects.name')->orderBy('periods.number')->get();
         foreach ($rows as $row) {
-            foreach (['c1_score', 'c2_score', 'c3_score', 'period_score', 'rp_score', 'effective_score'] as $field) {
+            foreach (['c1_score', 'c2_score', 'c3_score', 'c4_score', 'period_score', 'rp_score', 'effective_score'] as $field) {
                 $row->$field = $row->$field === null ? null : (float) $row->$field;
             }
         }

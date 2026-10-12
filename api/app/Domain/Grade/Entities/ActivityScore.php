@@ -8,7 +8,7 @@ namespace App\Domain\Grade\Entities;
  *
  * Es la unidad mínima de evaluación del sistema.
  * Una fila en activity_scores = un estudiante × una actividad
- * × una competencia (C1, C2 o C3) × un período.
+ * × una competencia (C1, C2, C3 o C4) × un período.
  *
  * El score puede ser NULL si la actividad no se usó
  * para ese estudiante — las actividades NULL se ignoran
@@ -19,7 +19,7 @@ class ActivityScore
     /**
      * @param int        $activityId   ID de la actividad (base o adicional del docente)
      * @param int        $studentId    ID del estudiante
-     * @param int        $competencyId ID de la competencia: 1=C1, 2=C2, 3=C3
+     * @param int        $competencyId ID de la competencia: 1=C1, 2=C2, 3=C3, 4=C4
      * @param int        $periodId     ID del período académico
      * @param int        $subjectId    ID de la asignatura
      * @param float|null $score        Nota de 0 a 100. NULL si la actividad no se usó en este período

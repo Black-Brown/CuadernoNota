@@ -230,7 +230,7 @@ Reglas de seguridad:
 | `student_enrollments` | Historial de matrículas por sección. |
 | `activity_templates` | Tipos de actividad base definidos por administración. |
 | `activities` | Actividades habilitadas o creadas en un workspace docente. |
-| `competencies` | Competencias C1, C2 y C3. |
+| `competencies` | Competencias C1, C2, C3 y C4. |
 | `activity_scores` | Nota de estudiante por actividad y competencia. |
 | `period_grades` | Resumen del período y su estado de revisión. |
 | `final_grades` | Calificación final y recuperaciones finales/especiales. |
@@ -262,15 +262,16 @@ Reglas de seguridad:
 
 ### Calificaciones
 
-Las actividades se califican bajo tres competencias:
+Las actividades se califican bajo cuatro competencias:
 
 - `C1`: comunicativa.
 - `C2`: pensamiento lógico, creativo y crítico.
 - `C3`: científica y tecnológica.
+- `C4`: Ética y ciudadanía + Desarrollo personal y espiritual (una sola nota).
 
 ```text
 Competencia = promedio de sus actividades calificadas
-Nota del período = promedio de C1, C2 y C3
+Nota del período = (C1 + C2 + C3 + C4) / 4
 Nota final = promedio de las notas efectivas de los cuatro períodos
 ```
 
@@ -282,9 +283,11 @@ draft → in_review → official
           └─ rechazo ────┴─ reapertura → draft
 ```
 
-Las notas de una actividad desactivada se conservan como historial, pero no se muestran en el registro docente ni participan en C1, C2, C3, la nota del período o los indicadores de riesgo. Al reactivar la actividad, la API vuelve a incluirlas y recalcula los resúmenes afectados.
+Las notas de una actividad desactivada se conservan como historial, pero no se muestran en el registro docente ni participan en C1, C2, C3, C4, la nota del período o los indicadores de riesgo. Al reactivar la actividad, la API vuelve a incluirlas y recalcula los resúmenes afectados.
 
-El docente registra y guarda el progreso desde cada actividad. El envío a revisión es una acción única del workspace y no aparece dentro de una actividad individual. Solo se habilita cuando el período termina según su estado efectivo (el día posterior a `end_date`) y todos los estudiantes activos de la sección tienen C1, C2, C3 y nota del período completas. Una vez enviado, el workspace queda en `in_review` hasta que coordinación lo apruebe o lo rechace.
+El docente registra y guarda el progreso desde cada actividad. El envío a revisión es una acción única del workspace y no aparece dentro de una actividad individual. Solo se habilita cuando el período termina según su estado efectivo (el día posterior a `end_date`) y todos los estudiantes activos de la sección tienen C1, C2, C3, C4 y nota del período completas. Una vez enviado, el workspace queda en `in_review` hasta que coordinación lo apruebe o lo rechace.
+
+El endpoint de notas acepta `competency_id` de 1 a 4. Se permite guardar progreso por celda, pero cada actividad iniciada debe tener sus cuatro notas para calcular el resumen. Las respuestas de actividades incluyen `c4` y los resúmenes incluyen `c4_score`. C4 vacía no se convierte en cero. La migración de C4 conserva promedios y estados históricos; una nota oficial anterior no se recalcula automáticamente. Los borradores sin C4 no pueden enviarse a revisión hasta completarse.
 
 ### Promoción
 

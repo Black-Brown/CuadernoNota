@@ -30,7 +30,7 @@ class TeacherActivityScoreConsistencyTest extends TestCase
         $context = $this->academicContext();
         Sanctum::actingAs($context['teacher']);
 
-        foreach ([1 => 80, 2 => 90, 3 => 100] as $competencyId => $score) {
+        foreach ([1 => 80, 2 => 90, 3 => 100, 4 => 90] as $competencyId => $score) {
             $this->postJson('/api/docente/grades/activity-score', $this->scorePayload(
                 $context,
                 $competencyId,
@@ -80,7 +80,7 @@ class TeacherActivityScoreConsistencyTest extends TestCase
         $context = $this->academicContext();
         Sanctum::actingAs($context['teacher']);
 
-        foreach ([1 => 80, 2 => 90, 3 => 100] as $competencyId => $score) {
+        foreach ([1 => 80, 2 => 90, 3 => 100, 4 => 90] as $competencyId => $score) {
             $this->postJson('/api/docente/grades/activity-score', $this->scorePayload(
                 $context,
                 $competencyId,
@@ -101,13 +101,13 @@ class TeacherActivityScoreConsistencyTest extends TestCase
             ->assertJsonPath('period_grade.c1_score', 70)
             ->assertJsonPath('period_grade.c2_score', 90)
             ->assertJsonPath('period_grade.c3_score', 100)
-            ->assertJsonPath('period_grade.period_score', 86.67);
+            ->assertJsonPath('period_grade.period_score', 87.5);
 
         $this->assertDatabaseHas('period_grades', [
             'student_id' => $context['student_id'],
             'subject_id' => $context['subject_id'],
             'period_id' => $context['period_id'],
-            'period_score' => 86.67,
+            'period_score' => 87.5,
             'status' => 'draft',
         ]);
     }
@@ -118,7 +118,7 @@ class TeacherActivityScoreConsistencyTest extends TestCase
         $secondActivityId = $this->createActivity($context, 'Proyecto alterno');
         Sanctum::actingAs($context['teacher']);
 
-        foreach ([1, 2, 3] as $competencyId) {
+        foreach ([1, 2, 3, 4] as $competencyId) {
             $this->postJson('/api/docente/grades/activity-score', [
                 ...$this->scorePayload($context, $competencyId, 20),
                 'activity_id' => $context['activity_id'],
@@ -144,7 +144,7 @@ class TeacherActivityScoreConsistencyTest extends TestCase
             ->assertJsonPath('activity.active', false)
             ->assertJsonPath('activity.recalculated_students', 1);
 
-        $this->assertDatabaseCount('activity_scores', 6);
+        $this->assertDatabaseCount('activity_scores', 8);
         $this->assertDatabaseHas('activity_scores', [
             'activity_id' => $context['activity_id'],
             'student_id' => $context['student_id'],
@@ -181,7 +181,7 @@ class TeacherActivityScoreConsistencyTest extends TestCase
             ->assertJsonFragment([
                 'id' => $context['activity_id'],
                 'active' => false,
-                'score_count' => 3,
+                'score_count' => 4,
             ]);
 
         $this->getJson(
@@ -199,7 +199,7 @@ class TeacherActivityScoreConsistencyTest extends TestCase
         $secondActivityId = $this->createActivity($context, 'Proyecto alterno');
         Sanctum::actingAs($context['teacher']);
 
-        foreach ([1, 2, 3] as $competencyId) {
+        foreach ([1, 2, 3, 4] as $competencyId) {
             $this->postJson('/api/docente/grades/activity-score', [
                 ...$this->scorePayload($context, $competencyId, 20),
                 'activity_id' => $context['activity_id'],
@@ -237,7 +237,7 @@ class TeacherActivityScoreConsistencyTest extends TestCase
         $context = $this->academicContext();
         Sanctum::actingAs($context['teacher']);
 
-        foreach ([1 => 70, 2 => 80, 3 => 90] as $competencyId => $score) {
+        foreach ([1 => 70, 2 => 80, 3 => 90, 4 => 80] as $competencyId => $score) {
             $this->postJson('/api/docente/grades/activity-score', $this->scorePayload(
                 $context,
                 $competencyId,
@@ -259,7 +259,84 @@ class TeacherActivityScoreConsistencyTest extends TestCase
             'subject_id' => $context['subject_id'],
             'period_id' => $context['period_id'],
         ]);
-        $this->assertDatabaseCount('activity_scores', 3);
+        $this->assertDatabaseCount('activity_scores', 4);
+    }
+
+    public function test_c4_is_required_and_zero_is_a_real_score(): void
+    {
+        $context = $this->academicContext();
+        Sanctum::actingAs($context['teacher']);
+        foreach ([1, 2, 3] as $competency) {
+            $this->postJson('/api/docente/grades/activity-score', $this->scorePayload($context, $competency, 100))
+                ->assertCreated()->assertJsonPath('period_grade', null);
+        }
+        $this->assertDatabaseCount('period_grades', 0);
+        $this->postJson('/api/docente/grades/activity-score', $this->scorePayload($context, 4, 0))
+            ->assertCreated()->assertJsonPath('period_grade.c4_score', 0)
+            ->assertJsonPath('period_grade.period_score', 75);
+        $this->getJson("/api/docente/grades/activity/{$context['activity_id']}/{$context['period_id']}?section_id={$context['section_id']}")
+            ->assertOk()->assertJsonPath('students.0.c4', 0);
+        $this->postJson('/api/docente/grades/activity-score', $this->scorePayload($context, 4, null))
+            ->assertCreated()->assertJsonPath('period_grade', null);
+        $this->assertDatabaseCount('period_grades', 0);
+    }
+
+    public function test_incomplete_second_activity_cannot_produce_a_complete_summary(): void
+    {
+        $context = $this->academicContext();
+        Sanctum::actingAs($context['teacher']);
+        foreach ([1, 2, 3, 4] as $competency) {
+            $this->postJson('/api/docente/grades/activity-score', $this->scorePayload($context, $competency, 80))->assertCreated();
+        }
+        $second = $this->createActivity($context, 'Segunda actividad');
+        $this->postJson('/api/docente/grades/activity-score', [
+            ...$this->scorePayload($context, 1, 100), 'activity_id' => $second,
+        ])->assertCreated()->assertJsonPath('period_grade', null);
+        $this->assertDatabaseCount('period_grades', 0);
+        foreach ([2, 3, 4] as $competency) {
+            $response = $this->postJson('/api/docente/grades/activity-score', [
+                ...$this->scorePayload($context, $competency, 100), 'activity_id' => $second,
+            ])->assertCreated();
+        }
+        $response->assertJsonPath('period_grade.c4_score', 90)->assertJsonPath('period_grade.period_score', 90);
+    }
+
+    public function test_c4_respects_range_and_course_and_official_guards(): void
+    {
+        $context = $this->academicContext();
+        Sanctum::actingAs($context['teacher']);
+        foreach ([-1, 101] as $invalid) {
+            $this->postJson('/api/docente/grades/activity-score', $this->scorePayload($context, 4, $invalid))
+                ->assertUnprocessable()->assertJsonValidationErrors('score');
+        }
+        Sanctum::actingAs(User::factory()->create(['role' => 'teacher', 'active' => true]));
+        $this->postJson('/api/docente/grades/activity-score', $this->scorePayload($context, 4, 90))->assertForbidden();
+        Sanctum::actingAs($context['teacher']);
+        DB::table('period_grades')->insert([
+            'student_id' => $context['student_id'], 'subject_id' => $context['subject_id'],
+            'period_id' => $context['period_id'], 'section_id' => $context['section_id'],
+            'c1_score' => 80, 'c2_score' => 80, 'c3_score' => 80, 'period_score' => 80,
+            'status' => 'official',
+        ]);
+        $this->postJson('/api/docente/grades/activity-score', $this->scorePayload($context, 4, 90))->assertStatus(423);
+        app(\App\Application\Grade\RecalculatePeriodGrade::class)->execute($context['student_id'], $context['subject_id'], $context['period_id']);
+        $this->assertDatabaseHas('period_grades', ['student_id' => $context['student_id'], 'period_score' => 80, 'c4_score' => null, 'status' => 'official']);
+    }
+
+    public function test_migration_preserves_legacy_grades_without_backfilling_c4(): void
+    {
+        $context = $this->academicContext();
+        $migration = require database_path('migrations/2026_10_12_000001_add_fourth_competency.php');
+        $migration->down();
+        DB::table('period_grades')->insert([
+            'student_id' => $context['student_id'], 'subject_id' => $context['subject_id'],
+            'period_id' => $context['period_id'], 'section_id' => $context['section_id'],
+            'c1_score' => 70, 'c2_score' => 80, 'c3_score' => 90, 'period_score' => 80,
+            'rp_score' => 85, 'status' => 'official',
+        ]);
+        $migration->up();
+        $this->assertDatabaseHas('competencies', ['id' => 4, 'code' => 'C4']);
+        $this->assertDatabaseHas('period_grades', ['student_id' => $context['student_id'], 'period_score' => 80, 'rp_score' => 85, 'c4_score' => null, 'status' => 'official']);
     }
 
     private function scorePayload(array $context, int $competencyId, ?int $score): array

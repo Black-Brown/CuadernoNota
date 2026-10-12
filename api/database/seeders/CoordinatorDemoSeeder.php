@@ -63,7 +63,7 @@ class CoordinatorDemoSeeder extends Seeder
                     foreach ($subjects as $index => $subject) {
                         $score = $i === 1 ? 60 : 72 + $i * 3;
                         $this->ensure('period_grades', ['student_id' => $student, 'subject_id' => $subject, 'period_id' => $period->id], [
-                            'section_id' => $section, 'c1_score' => $score, 'c2_score' => $score, 'c3_score' => $score, 'period_score' => $score,
+                            'section_id' => $section, 'c1_score' => $score, 'c2_score' => $score, 'c3_score' => $score, 'c4_score' => $score, 'period_score' => $score,
                             'status' => $index === 0 ? 'in_review' : 'official',
                         ]);
                         for ($day = 0; $day < 3; $day++) {
