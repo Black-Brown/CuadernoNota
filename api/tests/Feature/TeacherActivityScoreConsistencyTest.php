@@ -339,6 +339,111 @@ class TeacherActivityScoreConsistencyTest extends TestCase
         $this->assertDatabaseHas('period_grades', ['student_id' => $context['student_id'], 'period_score' => 80, 'rp_score' => 85, 'c4_score' => null, 'status' => 'official']);
     }
 
+    public function test_explicit_weights_recalculate_all_four_competencies_and_preserve_legacy_mode(): void
+    {
+        $context = $this->academicContext();
+        Sanctum::actingAs($context['teacher']);
+        $second = $this->createActivity($context, 'Examen');
+        // Previously saved percentages are informational until explicitly configured.
+        DB::table('course_activities')->where('id', $context['activity_id'])->update(['weight' => 100]);
+        foreach ([1, 2, 3, 4] as $competency) {
+            $this->postJson('/api/docente/grades/activity-score', $this->scorePayload($context, $competency, 90))->assertCreated();
+            $this->postJson('/api/docente/grades/activity-score', [...$this->scorePayload($context, $competency, 80), 'activity_id' => $second])->assertCreated();
+        }
+        $this->assertDatabaseHas('period_grades', ['student_id' => $context['student_id'], 'period_score' => 85]);
+        $payload = ['section_id' => $context['section_id'], 'subject_id' => $context['subject_id'], 'period_id' => $context['period_id'],
+            'weights' => [['id' => $context['activity_id'], 'weight' => 60], ['id' => $second, 'weight' => 40]]];
+        $this->putJson('/api/docente/activity-weights', $payload)->assertOk()->assertJsonPath('weighting.valid', true);
+        $this->assertDatabaseHas('period_grades', ['student_id' => $context['student_id'], 'c1_score' => 86, 'c2_score' => 86, 'c3_score' => 86, 'c4_score' => 86, 'period_score' => 86]);
+        $payload['weights'] = [['id' => $context['activity_id'], 'weight' => 25], ['id' => $second, 'weight' => 75]];
+        $this->putJson('/api/docente/activity-weights', $payload)->assertOk();
+        $this->assertDatabaseHas('period_grades', ['student_id' => $context['student_id'], 'period_score' => 82.5]);
+        DB::table('period_grades')->where('student_id', $context['student_id'])->update(['rp_score' => 85]);
+        $this->patchJson("/api/docente/activities/{$context['activity_id']}", ['weight' => 10])->assertUnprocessable();
+        $this->assertDatabaseHas('period_grades', ['student_id' => $context['student_id'], 'period_score' => 82.5, 'rp_score' => 85]);
+        $this->assertDatabaseHas('course_activities', ['id' => $context['activity_id'], 'weight' => 25]);
+        DB::table('period_grades')->where('student_id', $context['student_id'])->update(['rp_score' => null]);
+        $this->patchJson("/api/docente/activities/{$second}", [])->assertOk();
+        $this->assertDatabaseCount('period_grades', 0);
+        $this->assertDatabaseCount('activity_scores', 8);
+        $payload['weights'] = [['id' => $context['activity_id'], 'weight' => 100]];
+        $this->putJson('/api/docente/activity-weights', $payload)->assertOk();
+        $this->assertDatabaseHas('period_grades', ['student_id' => $context['student_id'], 'period_score' => 90]);
+        $this->patchJson("/api/docente/activities/{$second}", [])->assertOk();
+        $this->assertDatabaseCount('period_grades', 0);
+        $this->getJson("/api/docente/activities/{$context['subject_id']}?section_id={$context['section_id']}&period_id={$context['period_id']}")
+            ->assertOk()->assertJsonPath('weighting.valid', false)->assertJsonPath('weighting.mode', 'weighted');
+    }
+
+    public function test_weighted_mode_requires_unscored_active_activities_and_invalid_totals_do_not_write(): void
+    {
+        $context = $this->academicContext();
+        Sanctum::actingAs($context['teacher']);
+        $second = $this->createActivity($context, 'Sin notas');
+        $payload = ['section_id' => $context['section_id'], 'subject_id' => $context['subject_id'], 'period_id' => $context['period_id'],
+            'weights' => [['id' => $context['activity_id'], 'weight' => 60], ['id' => $second, 'weight' => 30]]];
+        $this->putJson('/api/docente/activity-weights', $payload)->assertUnprocessable();
+        $this->assertDatabaseMissing('course_activities', ['weight_configured' => true]);
+        $payload['weights'][1]['weight'] = 40;
+        $this->putJson('/api/docente/activity-weights', $payload)->assertOk();
+        foreach ([1, 2, 3, 4] as $competency) {
+            $this->postJson('/api/docente/grades/activity-score', $this->scorePayload($context, $competency, 100))
+                ->assertCreated()->assertJsonPath('period_grade', null);
+        }
+        $this->assertDatabaseCount('period_grades', 0);
+        foreach ([1, 2, 3, 4] as $competency) {
+            $response = $this->postJson('/api/docente/grades/activity-score', [...$this->scorePayload($context, $competency, 0), 'activity_id' => $second])->assertCreated();
+        }
+        $response->assertJsonPath('period_grade.period_score', 60);
+        $payload['weights'][1]['id'] = 999999;
+        $this->putJson('/api/docente/activity-weights', $payload)->assertUnprocessable();
+        $this->assertDatabaseHas('course_activities', ['id' => $second, 'weight' => 40]);
+    }
+
+    public function test_weight_configuration_respects_teacher_period_and_official_guards(): void
+    {
+        $context = $this->academicContext();
+        $payload = ['section_id' => $context['section_id'], 'subject_id' => $context['subject_id'], 'period_id' => $context['period_id'],
+            'weights' => [['id' => $context['activity_id'], 'weight' => 100]]];
+        Sanctum::actingAs(User::factory()->create(['role' => 'teacher', 'active' => true]));
+        $this->putJson('/api/docente/activity-weights', $payload)->assertForbidden();
+        $this->patchJson("/api/docente/activities/{$context['activity_id']}", ['weight' => 100])->assertForbidden();
+        Sanctum::actingAs($context['teacher']);
+        DB::table('periods')->where('id', $context['period_id'])->update(['status' => 'closed']);
+        $this->putJson('/api/docente/activity-weights', $payload)->assertStatus(423);
+        DB::table('periods')->where('id', $context['period_id'])->update(['status' => 'open']);
+        DB::table('period_grades')->insert([
+            'student_id' => $context['student_id'], 'subject_id' => $context['subject_id'], 'period_id' => $context['period_id'], 'section_id' => $context['section_id'],
+            'c1_score' => 90, 'c2_score' => 90, 'c3_score' => 90, 'c4_score' => 90, 'period_score' => 90, 'status' => 'official',
+        ]);
+        $this->putJson('/api/docente/activity-weights', $payload)->assertStatus(423);
+        $this->patchJson("/api/docente/activities/{$context['activity_id']}", ['weight' => 100])->assertStatus(423);
+        $this->assertDatabaseHas('period_grades', ['student_id' => $context['student_id'], 'period_score' => 90, 'status' => 'official']);
+        $this->assertDatabaseMissing('course_activities', ['weight_configured' => true]);
+    }
+
+    public function test_creating_and_editing_weights_invalidates_drafts_until_the_total_is_complete(): void
+    {
+        $context = $this->academicContext();
+        Sanctum::actingAs($context['teacher']);
+        foreach ([1, 2, 3, 4] as $competency) {
+            $this->postJson('/api/docente/grades/activity-score', $this->scorePayload($context, $competency, 90))->assertCreated();
+        }
+        $this->patchJson("/api/docente/activities/{$context['activity_id']}", ['weight' => 100])->assertOk()->assertJsonPath('weighting.valid', true);
+        $response = $this->postJson('/api/docente/activities', [
+            'name' => 'Examen ponderado', 'section_id' => $context['section_id'], 'subject_id' => $context['subject_id'],
+            'period_id' => $context['period_id'], 'weight' => 40,
+        ])->assertCreated();
+        $second = $response->json('activity.id');
+        $this->assertDatabaseHas('course_activities', ['id' => $second, 'weight' => 40, 'weight_configured' => true]);
+        $this->assertDatabaseCount('period_grades', 0);
+        $this->patchJson("/api/docente/activities/{$context['activity_id']}", ['weight' => 60])->assertOk()->assertJsonPath('weighting.valid', true);
+        foreach ([1, 2, 3, 4] as $competency) {
+            $response = $this->postJson('/api/docente/grades/activity-score', [...$this->scorePayload($context, $competency, 80), 'activity_id' => $second])->assertCreated();
+        }
+        $response->assertJsonPath('period_grade.period_score', 86);
+    }
+
     private function scorePayload(array $context, int $competencyId, ?int $score): array
     {
         return [

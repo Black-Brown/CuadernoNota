@@ -270,12 +270,13 @@ Las actividades se califican bajo cuatro competencias:
 - `C4`: Ética y ciudadanía + Desarrollo personal y espiritual (una sola nota).
 
 ```text
-Competencia = promedio de sus actividades calificadas
+Competencia (modo equitativo) = promedio de sus actividades calificadas
+Competencia (modo porcentajes) = suma(nota de actividad × porcentaje / 100)
 Nota del período = (C1 + C2 + C3 + C4) / 4
 Nota final = promedio de las notas efectivas de los cuatro períodos
 ```
 
-Solo se incluyen actividades que tengan una nota registrada. La recuperación pedagógica (`rp`) sustituye la nota ordinaria del período en el cálculo final. Los estados de las notas de período son:
+En modo equitativo se incluyen las actividades calificadas. En modo porcentajes, todas las actividades activas deben tener sus notas y sus porcentajes deben sumar 100%; mientras falten datos, el resultado queda pendiente. Una nota vacía no equivale a cero. Las actividades existentes conservan el modo equitativo hasta configurar explícitamente sus porcentajes. La recuperación pedagógica (`rp`) sustituye la nota ordinaria del período en el cálculo final. Los estados de las notas de período son:
 
 ```text
 draft → in_review → official
@@ -767,6 +768,8 @@ Crear actividad:
 ```
 
 Campos opcionales: `description`, `type`, `status`, `due_date`, `weight` e `icon`. Estados admitidos: `active`, `draft` e `inactive`.
+
+`weight` configura el porcentaje de la actividad (mayor que 0, hasta 100, máximo dos decimales). Los valores históricos no se activan automáticamente. Para guardar el reparto completo, usar `PUT /api/docente/activity-weights` con `section_id`, `subject_id`, `period_id` y `weights: [{id, weight}]`: debe incluir todas las actividades activas de ese curso/período y sumar 100%. También se puede ajustar una actividad con `PATCH /api/docente/activities/{id}` enviando `weight`. Un reparto parcial bloquea el cálculo completo y el envío a revisión. Ver [ponderación de actividades](ISSUE_34_PONDERACION_ACTIVIDADES.md).
 
 Registrar una nota:
 

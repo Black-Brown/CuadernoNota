@@ -32,6 +32,7 @@ class EloquentActivityRepository implements ActivityRepositoryInterface
                 'status'      => $a->status ?? ($a->active ? 'active' : 'inactive'),
                 'due_date'    => $a->due_date ? $a->due_date->format('Y-m-d') : null,
                 'weight'      => $a->weight,
+                'weight_configured' => $a->weight_configured,
                 'icon'        => $a->icon ?? 'assignment',
                 'is_base'     => (bool) $a->is_base,
                 'active'      => (bool) $a->active,
@@ -63,6 +64,7 @@ class EloquentActivityRepository implements ActivityRepositoryInterface
             'status'           => $status,
             'due_date'         => $data['due_date'] ?? null,
             'weight'           => isset($data['weight']) ? (float) $data['weight'] : null,
+            'weight_configured' => isset($data['weight']),
             'period_id'        => $data['period_id'] ?? null,
             'created_by'       => $data['user_id'],
         ]);

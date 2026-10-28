@@ -36,6 +36,7 @@ class RecalculatePeriodGrade
             $studentId,
             $subjectId,
             $periodId,
+            $sectionId ?? $existing?->sectionId,
         );
 
         $c1 = $this->competencyCalc->calculate($scores, 1);

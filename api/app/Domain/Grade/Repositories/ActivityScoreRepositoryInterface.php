@@ -44,7 +44,8 @@ interface ActivityScoreRepositoryInterface
     public function findByStudentSubjectPeriod(
         int $studentId,
         int $subjectId,
-        int $periodId
+        int $periodId,
+        ?int $sectionId = null
     ): array;
 
     /**

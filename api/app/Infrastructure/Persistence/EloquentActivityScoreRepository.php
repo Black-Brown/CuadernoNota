@@ -48,12 +48,30 @@ class EloquentActivityScoreRepository implements ActivityScoreRepositoryInterfac
     public function findByStudentSubjectPeriod(
         int $studentId,
         int $subjectId,
-        int $periodId
+        int $periodId,
+        ?int $sectionId = null
     ): array {
+        $sectionId ??= (int) StudentModel::where('id', $studentId)->value('section_id');
+        $weighting = \App\Infrastructure\Support\ActivityWeighting::summary($sectionId, $subjectId, $periodId);
+        if ($weighting['mode'] === 'weighted') {
+            $saved = ActivityScoreModel::where('student_id', $studentId)->where('subject_id', $subjectId)
+                ->where('period_id', $periodId)->whereIn('activity_id', array_keys($weighting['weights']))->get()
+                ->keyBy(fn ($row) => $row->activity_id.':'.$row->competency_id);
+            $rows = [];
+            foreach ($weighting['weights'] as $activityId => $weight) {
+                foreach ([1, 2, 3, 4] as $competencyId) {
+                    $rows[] = ['activity_id' => $activityId, 'competency_id' => $competencyId,
+                        'weight' => $weighting['valid'] ? $weight : null,
+                        'score' => $saved->get($activityId.':'.$competencyId)?->score];
+                }
+            }
+            return $rows;
+        }
         return ActivityScoreModel::where('student_id', $studentId)
             ->where('subject_id', $subjectId)
             ->where('period_id', $periodId)
             ->whereHas('activity', fn ($query) => $query->where('status', 'active'))
+            ->whereHas('activity.courseOffering', fn ($query) => $query->where('section_id', $sectionId))
             ->get(['activity_id', 'competency_id', 'score'])
             ->map(fn($m) => [
                 'activity_id' => (int) $m->activity_id,

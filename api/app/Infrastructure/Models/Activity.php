@@ -12,12 +12,13 @@ class Activity extends Model
 
     protected $fillable = [
         'course_offering_id', 'period_id', 'activity_template_id', 'created_by',
-        'name', 'description', 'type', 'status', 'due_date', 'weight',
+        'name', 'description', 'type', 'status', 'due_date', 'weight', 'weight_configured',
     ];
 
     protected $casts = [
         'due_date' => 'date:Y-m-d',
         'weight'   => 'float',
+        'weight_configured' => 'boolean',
     ];
 
     protected $appends = [

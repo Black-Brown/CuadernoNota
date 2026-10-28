@@ -31,6 +31,18 @@ class CompetencyCalculator
      */
     public function calculate(array $scores, int $competencyId): ?float
     {
+        $entries = array_values(array_filter($scores, fn ($s) => $s['competency_id'] === $competencyId));
+        if ($entries && array_key_exists('weight', $entries[0])) {
+            $total = 0;
+            $sum = 0;
+            foreach ($entries as $entry) {
+                if ($entry['score'] === null || $entry['weight'] === null || $entry['weight'] <= 0 || $entry['weight'] > 100) return null;
+                $units = (int) round($entry['weight'] * 100);
+                $total += $units;
+                $sum += $entry['score'] * $units;
+            }
+            return $total === 10000 ? round($sum / 10000, 2) : null;
+        }
         // Filtrar solo las actividades de esta competencia que tienen nota
         $filtered = array_filter(
             $scores,
