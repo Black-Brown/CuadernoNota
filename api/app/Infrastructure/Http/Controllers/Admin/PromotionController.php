@@ -112,7 +112,12 @@ class PromotionController extends Controller
         $enrollment = StudentEnrollment::with(['student.finalGrades', 'section.grade'])
             ->lockForUpdate()
             ->findOrFail($enrollmentId);
+        DB::table('students')->where('id', $enrollment->student_id)->lockForUpdate()->firstOrFail();
         $existing = DB::table('promotion_decisions')->where('student_enrollment_id', $enrollment->id)->first();
+        $existing ??= DB::table('promotion_decisions')->whereNull('student_enrollment_id')
+            ->where('student_id', $enrollment->student_id)
+            ->where('academic_year_id', $enrollment->section->academic_year_id)
+            ->orderByDesc('decided_at')->orderByDesc('id')->first();
 
         if ($existing?->placement_status === 'assigned') {
             throw ValidationException::withMessages([
@@ -155,8 +160,10 @@ class PromotionController extends Controller
         }
 
         DB::table('promotion_decisions')->updateOrInsert(
-            ['student_enrollment_id' => $enrollment->id],
-            ['status' => $data['status'], 'target_grade_id' => $data['target_grade_id'], 'destination_section_id' => null,
+            $existing ? ['id' => $existing->id] : ['student_enrollment_id' => $enrollment->id],
+            ['student_enrollment_id' => $enrollment->id, 'source' => 'administrative',
+             'student_id' => $enrollment->student_id, 'academic_year_id' => $enrollment->section->academic_year_id,
+             'status' => $data['status'], 'target_grade_id' => $data['target_grade_id'], 'destination_section_id' => null,
              'placement_status' => 'pending', 'justification' => $data['justification'] ?? null,
              'decided_by' => $adminId, 'decided_at' => now(), 'created_at' => $existing?->created_at ?? now(), 'updated_at' => now()]
         );

@@ -100,9 +100,14 @@ class AdminStudentWorkflowTest extends TestCase
 
         DB::table('periods')->where('id', $periodId)->update(['status' => 'closed']);
 
+        // Existing unlinked history must be completed, not duplicated by the administrative flow.
+        app(\App\Infrastructure\Persistence\EloquentPromotionRepository::class)->markAsPromoted($studentId, $yearId);
+
         $this->postJson("/api/admin/promotions/{$enrollmentId}/decision", [
             'status' => 'promoted', 'target_grade_id' => $nextGradeId,
         ])->assertOk()->assertJsonPath('status', 'promoted');
+        $this->assertDatabaseCount('promotion_decisions', 1);
+        $this->assertDatabaseHas('promotion_decisions', ['student_id' => $studentId, 'academic_year_id' => $yearId, 'source' => 'administrative']);
         $this->assertDatabaseHas('students', ['id' => $studentId, 'section_id' => null, 'academic_year_id' => null, 'active' => true]);
         $this->assertDatabaseHas('promotion_decisions', ['student_enrollment_id' => $enrollmentId, 'target_grade_id' => $nextGradeId, 'placement_status' => 'pending']);
         $this->getJson('/api/admin/student-placements/pending')->assertOk()

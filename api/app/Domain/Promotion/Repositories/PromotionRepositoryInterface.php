@@ -12,7 +12,7 @@ use App\Domain\Grade\Entities\FinalGrade;
  * Proporciona acceso a las Calificaciones Finales de todas las
  * asignaturas de un estudiante (lectura a través de la capa de
  * dominio de Grade) y permite registrar el resultado del proceso
- * de promoción en la tabla student_promotions.
+ * de promoción en la tabla unificada promotion_decisions.
  */
 interface PromotionRepositoryInterface
 {

@@ -26,13 +26,13 @@ class ResetDataSchema
         'promotion_decisions' => 'Decisiones de promoción',
         'sections' => 'Secciones',
         'student_enrollments' => 'Matrículas',
-        'student_promotions' => 'Historial de promociones',
         'students' => 'Estudiantes',
         'subjects' => 'Materias',
         'teacher_assignments' => 'Asignaciones docentes',
     ];
 
     public const KEEP = [
+        'academic_levels' => 'Catálogo de niveles académicos',
         'activity_templates' => 'Catálogo de actividades base (incluye las seis fijas)',
         'academic_years' => 'Años escolares',
         'audit_logs' => 'Auditoría histórica (se añadirá el restablecimiento)',

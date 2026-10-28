@@ -18,6 +18,7 @@ class AdminAssignmentLevelsTest extends TestCase
         $year = DB::table('academic_years')->insertGetId(['name' => '2026-2027', 'start_date' => '2026-08-01', 'end_date' => '2027-06-30', 'active' => true]);
         $sections = [];
         foreach (['PRIMARIA', 'SECUNDARIA'] as $level) {
+            DB::table('academic_levels')->insert(['name' => $level]); // Historical catalog aliases remain supported.
             $grade = DB::table('grades')->insertGetId(['name' => 'Primero '.$level, 'level' => $level, 'sort_order' => 1, 'active' => true]);
             $sections[$level] = DB::table('sections')->insertGetId(['grade_id' => $grade, 'academic_year_id' => $year, 'name' => 'A', 'shift' => 'Matutina']);
         }

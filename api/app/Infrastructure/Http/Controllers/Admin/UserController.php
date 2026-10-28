@@ -85,7 +85,7 @@ class UserController extends Controller
             'email' => [$sometimes, 'email', 'max:255', Rule::unique('users')->ignore($user?->id)],
             'password' => ['nullable', 'string', 'min:8'],
             'role' => [$sometimes, Rule::in(['teacher', 'coordinator', 'admin'])],
-            'coordinator_level' => ['sometimes', 'nullable', Rule::in(CoordinatorScope::LEVELS)],
+            'coordinator_level' => ['sometimes', 'nullable', Rule::in(CoordinatorScope::LEVELS), 'exists:academic_levels,name'],
             'active' => ['sometimes', 'boolean'],
         ];
     }

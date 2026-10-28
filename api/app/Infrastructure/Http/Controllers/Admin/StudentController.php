@@ -205,7 +205,7 @@ class StudentController extends Controller
                 || $student->attendances()->exists()
                 || $student->observations()->exists()
                 || $student->alerts()->exists()
-                || DB::table('student_promotions')->where('student_id', $student->id)->exists();
+                || DB::table('promotion_decisions')->where('student_id', $student->id)->exists();
 
             if ($hasHistory) {
                 throw ValidationException::withMessages([

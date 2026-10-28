@@ -20,6 +20,7 @@ class CoordinatorPortalTest extends TestCase
         $primaryGrade = DB::table('grades')->insertGetId(['name' => 'Primero', 'level' => 'Primaria', 'sort_order' => 2]);
         $primary = DB::table('sections')->insertGetId(['grade_id' => $primaryGrade, 'academic_year_id' => $year, 'name' => 'A', 'shift' => 'Matutina']);
         // Misleading names never grant access: only the explicit level is used.
+        DB::table('academic_levels')->insert(['name' => 'Otro']);
         $unknownGrade = DB::table('grades')->insertGetId(['name' => 'Otra Secundaria', 'level' => 'Otro', 'sort_order' => 3]);
         $unknown = DB::table('sections')->insertGetId(['grade_id' => $unknownGrade, 'academic_year_id' => $year, 'name' => 'A', 'shift' => 'Matutina']);
         Sanctum::actingAs($coordinator);
@@ -36,6 +37,7 @@ class CoordinatorPortalTest extends TestCase
             }
             $this->postJson('/api/coordinador/grade-reviews/decision', ['section_id' => $forbidden, 'subject_id' => $subject, 'period_id' => $period, 'action' => 'approved'])->assertForbidden();
         }
+        DB::table('academic_levels')->insert(['name' => ' secundaria ']);
         $newGrade = DB::table('grades')->insertGetId(['name' => 'Segundo', 'level' => ' secundaria ', 'sort_order' => 4]);
         $newSection = DB::table('sections')->insertGetId(['grade_id' => $newGrade, 'academic_year_id' => $year, 'name' => 'C', 'shift' => 'Matutina']);
         $this->getJson('/api/coordinador/dashboard')->assertOk()->assertJsonPath('counts.sections', 3);

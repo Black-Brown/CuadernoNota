@@ -55,14 +55,13 @@ sin depender de cascadas.
 | `final_grades` | `student_id → students`, `subject_id → subjects`, `academic_year_id → academic_years` |
 | `grade_review_actions` | `period_id → periods`, `subject_id → subjects`, `section_id → sections`, `performed_by → users` |
 | `grade_subjects` | `grade_id → grades`, `subject_id → subjects` |
-| `grades` | Sin FK. |
+| `grades` | `level → academic_levels.name` |
 | `legacy_activities_unresolved` | Archivo académico de migración; payload sin FK física. |
 | `observations` | `student_id → students`, `user_id → users`, `section_id → sections`, `subject_id → subjects`, `period_id → periods` |
 | `period_grades` | `student_id → students`, `subject_id → subjects`, `period_id → periods`, `approved_by → users` |
-| `promotion_decisions` | `student_enrollment_id → student_enrollments`, `destination_section_id → sections`, `decided_by → users` |
+| `promotion_decisions` | `student_id → students`, `academic_year_id → academic_years`, `student_enrollment_id → student_enrollments`, `destination_section_id → sections`, `target_grade_id → grades`, `decided_by → users` |
 | `sections` | `grade_id → grades`, `academic_year_id → academic_years` |
 | `student_enrollments` | `student_id → students`, `section_id → sections`, `created_by → users` |
-| `student_promotions` | `student_id → students`, `academic_year_id → academic_years` |
 | `students` | `section_id → sections`, `academic_year_id → academic_years` |
 | `subjects` | Sin FK. |
 | `teacher_assignments` | `teacher_id → users`, `course_offering_id → course_offerings`, `assigned_by → users` |
@@ -93,7 +92,10 @@ No se encontraron tablas de horarios ni aulas; no se inventaron acciones para el
 
 ### PK, índices y cardinalidades
 
-Todas las tablas poseen PK `id`, excepto `cache`/`cache_locks` (`key`) y
+El catálogo `academic_levels` se conserva y tiene PK `name`; `users.coordinator_level` lo referencia.
+Las promociones históricas se consolidan en `promotion_decisions`; `student_promotions` deja de existir.
+
+Las demás tablas poseen PK `id`, excepto `cache`/`cache_locks` (`key`) y
 `password_reset_tokens` (`email`). `sessions.id` y `job_batches.id` son cadenas;
 las demás PK `id` son numéricas. No se reinician contadores/autoincrementos.
 
@@ -110,7 +112,6 @@ Los siguientes índices únicos describen las relaciones funcionales principales
 - `activity_scores(activity_id, student_id, competency_id, period_id, subject_id)`.
 - `period_grades(student_id, subject_id, period_id)`.
 - `final_grades(student_id, subject_id, academic_year_id)`.
-- `student_promotions(student_id, academic_year_id)`.
 - `attendances(student_id, date)`.
 - Otros únicos: `users.email`, `users.google_id`, `subjects.name`, `subjects.code`,
   `students.enrollment_no`, `activity_templates.name`,

@@ -111,7 +111,7 @@ class ReportController extends Controller
 
     public function backup(Request $request): StreamedResponse
     {
-        $tables = ['academic_years', 'grades', 'sections', 'subjects', 'grade_subjects', 'periods', 'users', 'students', 'student_enrollments',
+        $tables = ['academic_levels', 'academic_years', 'grades', 'sections', 'subjects', 'grade_subjects', 'periods', 'users', 'students', 'student_enrollments',
             'course_offerings', 'teacher_assignments', 'activity_templates', 'course_activities', 'competencies', 'activity_scores', 'period_grades',
             'final_grades', 'attendances', 'observations', 'alerts', 'promotion_decisions', 'grade_review_actions', 'audit_logs'];
         AuditLog::create(['user_id' => $request->user()->id, 'action' => 'backup', 'affected_table' => 'database', 'record_id' => 0, 'detail' => ['tables' => $tables], 'ip' => $request->ip()]);

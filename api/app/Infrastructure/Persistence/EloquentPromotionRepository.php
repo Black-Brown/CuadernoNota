@@ -37,17 +37,29 @@ class EloquentPromotionRepository implements PromotionRepositoryInterface
      */
     public function markAsPromoted(int $studentId, int $academicYearId): void
     {
-        DB::table('student_promotions')->updateOrInsert(
-            ['student_id' => $studentId, 'academic_year_id' => $academicYearId],
-            ['promoted_at' => now(), 'updated_at' => now(), 'created_at' => now()]
-        );
+        DB::transaction(function () use ($studentId, $academicYearId): void {
+            DB::table('students')->where('id', $studentId)->lockForUpdate()->firstOrFail();
+            $existing = DB::table('promotion_decisions')->where('student_id', $studentId)
+                ->where('academic_year_id', $academicYearId)->orderByDesc('decided_at')->orderByDesc('id')->first();
+            if ($existing) {
+                if ($existing->status !== 'promoted') {
+                    throw new \DomainException('Existe una decisión de no promoción que no puede sobrescribirse automáticamente.');
+                }
+                return;
+            }
+            DB::table('promotion_decisions')->insert([
+                'student_id' => $studentId, 'academic_year_id' => $academicYearId,
+                'status' => 'promoted', 'source' => 'automatic', 'placement_status' => null,
+                'decided_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        });
     }
 
     public function isPromoted(int $studentId, int $academicYearId): bool
     {
-        return DB::table('student_promotions')
+        return DB::table('promotion_decisions')
             ->where('student_id', $studentId)
             ->where('academic_year_id', $academicYearId)
-            ->exists();
+            ->orderByDesc('decided_at')->orderByDesc('id')->value('status') === 'promoted';
     }
 }
