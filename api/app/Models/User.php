@@ -31,6 +31,11 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    public function coordinatorAcademicLevel(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Infrastructure\Models\AcademicLevel::class, 'coordinator_level', 'name');
+    }
+
     protected function casts(): array
     {
         return [

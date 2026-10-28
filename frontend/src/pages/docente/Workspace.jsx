@@ -610,6 +610,7 @@ export default function Workspace() {
           </section>
         )}
 
+        {activitiesData?.weighting?.valid === false && <div role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Las ponderaciones están incompletas. Ajusta las actividades activas a 100% desde Gestión de actividades para calcular y enviar las notas del período.</div>}
         {!showGradesTable ? (
           <section className="space-y-6">
             <div className="flex items-center justify-between">

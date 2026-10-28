@@ -234,6 +234,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 '/activities/{id}',
                 [ActivityController::class, 'update']
             )->name('activities.update');
+            Route::put('/activity-weights', [ActivityController::class, 'weights'])->name('activities.weights');
 
             // Observaciones
             Route::get(

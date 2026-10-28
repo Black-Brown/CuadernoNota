@@ -16,6 +16,11 @@ class Grade extends Model
         'active' => 'boolean',
     ];
 
+    public function academicLevel(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(AcademicLevel::class, 'level', 'name');
+    }
+
     public function sections(): HasMany
     {
         return $this->hasMany(Section::class);

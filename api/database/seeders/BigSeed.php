@@ -650,10 +650,7 @@ class BigSeed extends Seeder
     {
         $section = $studentMap['7mo Grado|A'] ?? [];
         foreach (array_slice($section, 0, 8) as $studId) {
-            DB::table('student_promotions')->updateOrInsert(
-                ['student_id' => $studId, 'academic_year_id' => $yearId],
-                ['promoted_at' => now(), 'created_at' => now(), 'updated_at' => now()]
-            );
+            app(\App\Infrastructure\Persistence\EloquentPromotionRepository::class)->markAsPromoted($studId, $yearId);
         }
     }
 

@@ -94,6 +94,7 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
 
     public function submissionReadiness(int $subjectId, int $periodId, int $sectionId): array
     {
+        $weighting = \App\Infrastructure\Support\ActivityWeighting::summary($sectionId, $subjectId, $periodId);
         $students = StudentModel::query()
             ->where('section_id', $sectionId)
             ->where('active', true)
@@ -135,7 +136,8 @@ class EloquentPeriodGradeRepository implements PeriodGradeRepositoryInterface
             'total_students' => $totalStudents,
             'complete_students' => $totalStudents - $pendingStudents,
             'pending_students' => $pendingStudents,
-            'ready' => $totalStudents > 0 && $pendingStudents === 0,
+            'ready' => $totalStudents > 0 && $pendingStudents === 0 && $weighting['valid'],
+            'weighting' => $weighting,
             'pending' => $pending->all(),
         ];
     }

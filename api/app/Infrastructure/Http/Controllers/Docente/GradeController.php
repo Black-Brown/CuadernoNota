@@ -85,7 +85,8 @@ class GradeController extends Controller
             $periodId
         );
 
-        return response()->json(['activities' => $activities]);
+        return response()->json(['activities' => $activities, 'weighting' => $periodId
+            ? \App\Infrastructure\Support\ActivityWeighting::summary($sectionId, $subjectId, $periodId) : null]);
     }
 
     public function activityGrades(int $activityId, int $periodId): JsonResponse
@@ -141,6 +142,15 @@ class GradeController extends Controller
 
     public function submit(Request $request): JsonResponse
     {
+        return DB::transaction(function () use ($request) {
+            DB::table('course_offerings')->where('section_id', $request->integer('section_id'))
+                ->where('subject_id', $request->integer('subject_id'))->lockForUpdate()->first();
+            return $this->submitLocked($request);
+        });
+    }
+
+    private function submitLocked(Request $request): JsonResponse
+    {
         $validated = $request->validate([
             'subject_id' => 'required|integer|exists:subjects,id',
             'period_id'  => 'required|integer|exists:periods,id',
@@ -183,6 +193,9 @@ class GradeController extends Controller
         );
 
         if (! $readiness['ready']) {
+            if (! $readiness['weighting']['valid']) {
+                return response()->json(['message' => 'Las ponderaciones de actividades activas deben sumar 100%.', 'submission' => $readiness], 422);
+            }
             $message = $readiness['total_students'] === 0
                 ? 'No hay estudiantes activos en esta sección para enviar.'
                 : "Faltan calificaciones completas de {$readiness['pending_students']} estudiante(s).";
@@ -359,6 +372,9 @@ class GradeController extends Controller
         }
 
         $periodGrade = DB::transaction(function () use ($validated) {
+            DB::table('course_offerings')->where('section_id', $validated['section_id'])
+                ->where('subject_id', $validated['subject_id'])->lockForUpdate()->first();
+            abort_if($this->hasGradesUnderReviewOrOfficial((int) $validated['subject_id'], (int) $validated['section_id'], (int) $validated['period_id']), 423, 'Calificaciones en revisión u oficiales.');
             // Concurrent autosaves of different competencies must recalculate in order.
             DB::table('students')->where('id', $validated['student_id'])->lockForUpdate()->first();
             return $this->registerActivityScore->execute($validated);

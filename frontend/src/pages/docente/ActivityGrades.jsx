@@ -530,6 +530,7 @@ export default function ActivityGrades() {
       </section>
 
       {/* Grade entry table */}
+      {activitiesData?.weighting?.mode === 'weighted' && <p className="mb-3 text-xs text-slate-600">Ponderación de esta actividad: {currentActivity?.weight_configured ? `${currentActivity.weight}%` : 'Pendiente'}. {activitiesData.weighting.valid ? 'El cálculo del período requiere las notas de todas las actividades activas.' : 'El reparto de actividades no suma 100% o está incompleto. Ajústalo desde Gestión de actividades; puedes seguir guardando notas.'}</p>}
       <p className="mb-3 text-xs text-slate-500">Cada actividad requiere C1, C2, C3 y C4. El total es su promedio con igual peso (25% cada una). Puedes guardar el progreso; mientras falte una nota, el total queda pendiente.</p>
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm mb-6">
         <div className="overflow-x-auto">

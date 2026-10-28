@@ -15,6 +15,20 @@ class CompetencyCalculatorTest extends TestCase
 {
     private CompetencyCalculator $calculator;
 
+    public function test_weighted_average_requires_one_hundred_percent_and_all_scores(): void
+    {
+        $rows = [['competency_id' => 4, 'score' => 90, 'weight' => 60], ['competency_id' => 4, 'score' => 80, 'weight' => 40]];
+        $this->assertSame(86.0, $this->calculator->calculate($rows, 4));
+        $rows[1]['score'] = null;
+        $this->assertNull($this->calculator->calculate($rows, 4));
+        $rows[1]['score'] = 0;
+        $this->assertSame(54.0, $this->calculator->calculate($rows, 4));
+        $rows[1]['weight'] = 30;
+        $this->assertNull($this->calculator->calculate($rows, 4));
+        $rows[1]['weight'] = 50;
+        $this->assertNull($this->calculator->calculate($rows, 4));
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

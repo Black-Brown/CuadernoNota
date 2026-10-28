@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getActivitiesBySubject } from '../api/grades.api';
-import { createActivity, updateActivity } from '../api/activities.api';
+import { createActivity, updateActivity, saveActivityWeights } from '../api/activities.api';
+import { distributeActivityWeights, activityWeightSummary } from '../utils/activityWeights';
 
 import { BASE_ACTIVITY_PRESENTATION, getActivityPresentation } from '../utils/activityPresentation';
 
@@ -22,6 +23,7 @@ const EMPTY_FORM = {
   period_id:   '',
   status:      'active',
   due_date:    '',
+  weight:      '',
 };
 
 export default function ManageActivitiesModal({ subjectId, sectionId, periodId, periodName, periodStatus, lockedGradeStatus, onClose }) {
@@ -36,6 +38,7 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
   const [editingName, setEditingName] = useState('');
   const [toastMsg, setToastMsg]   = useState('');
   const [toastType, setToastType] = useState('success');
+  const [weights, setWeights] = useState({});
 
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: activitiesData, isLoading } = useQuery({
@@ -45,6 +48,19 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
   });
 
   const activities = activitiesData?.activities || [];
+  useEffect(() => {
+    setWeights(Object.fromEntries((activitiesData?.activities || []).map(a => [a.id, a.weight_configured ? String(a.weight ?? '') : ''])));
+  }, [activitiesData]);
+  const weightSummary = activityWeightSummary(activities, weights);
+  const refreshGrades = () => {
+    ['activitiesBySubject', 'periodGrades', 'periodGradesLock', 'gradebookSummary', 'subjectDashboard', 'courseRisk', 'studentRisk', 'riskOverview'].forEach(key => queryClient.invalidateQueries({ queryKey: [key] }));
+  };
+  const weightsMutation = useMutation({
+    mutationFn: () => saveActivityWeights({ section_id: Number(sectionId), subject_id: Number(subjectId), period_id: Number(periodId),
+      weights: activities.filter(a => a.active).map(a => ({ id: a.id, weight: Number(weights[a.id]) })) }),
+    onSuccess: () => { refreshGrades(); showToast('Ponderaciones guardadas. Se recalcularon los borradores completos.'); },
+    onError: error => showToast(error?.response?.data?.message || 'No se pudieron guardar las ponderaciones.', 'error'),
+  });
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const toggleMutation = useMutation({
@@ -52,6 +68,7 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
     onSuccess:  () => {
       queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, periodId] });
       showToast('Estado actualizado correctamente.');
+      refreshGrades();
     },
     onError: (error) => showToast(error?.response?.data?.message || 'Error al actualizar el estado.', 'error'),
   });
@@ -73,6 +90,7 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
       queryClient.invalidateQueries({ queryKey: ['activitiesBySubject', subjectId, sectionId, periodId] });
       setForm(EMPTY_FORM);
       setView('list');
+      refreshGrades();
       showToast(`"${data.activity?.name ?? 'Actividad'}" creada correctamente.`);
     },
     onError: (error) => showToast(error?.response?.data?.message || 'Error al crear la actividad.', 'error'),
@@ -133,6 +151,7 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
     if (!form.name.trim()) return;
 
     createMutation.mutate({
+      weight: form.weight === '' ? null : Number(form.weight),
       name:        form.name.trim(),
       subject_id:  subjectId,
       section_id:  Number(sectionId),
@@ -221,11 +240,22 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
                 </div>
               )}
 
-              <table className="w-full border-collapse text-left">
+              <section className="m-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <h3 className="text-sm font-bold text-slate-900">Ponderación por actividad</h3>
+                <p className="mt-1 text-xs text-slate-500">{activitiesData?.weighting?.mode === 'weighted' ? 'Modo porcentajes. Cada actividad activa debe tener sus cuatro notas para calcular el período.' : 'Actualmente se conserva el promedio equitativo. Los porcentajes se activan al guardarlos.'} C1, C2, C3 y C4 mantienen el mismo peso entre sí.</p>
+                {activitiesData?.weighting?.valid === false && <p role="alert" className="mt-2 text-xs font-bold text-amber-700">El reparto guardado está incompleto: ajusta las actividades activas hasta sumar 100%.</p>}
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <span className={`text-xs font-bold ${weightSummary.valid ? 'text-emerald-700' : 'text-slate-600'}`}>Total a guardar: {weightSummary.total.toFixed(2)}% / 100%</span>
+                  <button type="button" disabled={!canEditActivities || weightsMutation.isPending} onClick={() => setWeights(distributeActivityWeights(activities))} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold disabled:opacity-40">Repartir equitativamente</button>
+                  <button type="button" disabled={!canEditActivities || !weightSummary.valid || weightsMutation.isPending || toggleMutation.isPending} onClick={() => weightsMutation.mutate()} className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-3 py-2 text-xs font-bold text-white disabled:opacity-40"><span aria-hidden="true" className="material-symbols-outlined text-[18px] leading-none">save</span>{weightsMutation.isPending ? 'Guardando…' : 'Guardar ponderaciones'}</button>
+                </div>
+              </section>
+              <div className="overflow-x-auto"><table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     <th className="px-6 py-3.5 w-12">#</th>
                     <th className="px-6 py-3.5">Nombre de la Actividad</th>
+                    <th className="px-4 py-3.5 text-center">Peso (%)</th>
                     <th className="px-6 py-3.5 text-center w-32">Estado</th>
                     <th className="px-6 py-3.5 text-right w-28">Acciones</th>
                   </tr>
@@ -234,7 +264,7 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
 
                   {isLoading && (
                     <tr>
-                      <td colSpan="4" className="py-12 text-center text-slate-400 text-xs font-semibold">
+                      <td colSpan="5" className="py-12 text-center text-slate-400 text-xs font-semibold">
                         <span className="material-symbols-outlined animate-spin text-[28px] block mx-auto mb-2 text-slate-300">sync</span>
                         Cargando actividades...
                       </td>
@@ -243,7 +273,7 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
 
                   {!isLoading && activities.length === 0 && (
                     <tr>
-                      <td colSpan="4" className="py-12 text-center text-slate-400 text-xs font-semibold">
+                      <td colSpan="5" className="py-12 text-center text-slate-400 text-xs font-semibold">
                         No hay actividades configuradas para esta asignatura.
                       </td>
                     </tr>
@@ -303,6 +333,7 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
                           )}
                         </td>
 
+                        <td className="px-4 py-3.5 text-center"><input aria-label={`Ponderación de ${act.name}`} type="number" min="0.01" max="100" step="0.01" value={weights[act.id] ?? ''} placeholder="—" onChange={e => setWeights(prev => ({ ...prev, [act.id]: e.target.value }))} disabled={!act.active || !canEditActivities || weightsMutation.isPending} className="w-24 rounded-lg border border-slate-200 px-2 py-2 text-center text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-100" /></td>
                         <td className="px-6 py-3.5">
                           <div className="flex justify-center">
                             <label className="relative inline-flex items-center cursor-pointer select-none">
@@ -311,7 +342,7 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
                                 className="sr-only peer"
                                 checked={act.active}
                                 onChange={() => handleToggle(act)}
-                                disabled={toggleMutation.isPending || !canEditActivities}
+                                disabled={toggleMutation.isPending || weightsMutation.isPending || !canEditActivities}
                               />
                               <div className="w-11 h-6 bg-slate-200 rounded-full peer
                                 peer-checked:after:translate-x-full peer-checked:after:border-white
@@ -338,7 +369,7 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
                     );
                   })}
                 </tbody>
-              </table>
+              </table></div>
 
               {/* Add button */}
               <div className="px-6 py-4 border-t border-slate-200">
@@ -458,6 +489,10 @@ export default function ManageActivitiesModal({ subjectId, sectionId, periodId, 
               </div>
 
               {/* Due date */}
+              <label className="block space-y-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ponderación (%)
+                <input type="number" min="0.01" max="100" step="0.01" value={form.weight} onChange={e => handleFormChange('weight', e.target.value)} disabled={!canEditActivities} placeholder="Sin configurar" className="block w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm" />
+                <span className="block text-xs font-normal normal-case">Al configurar un porcentaje, completa el reparto de las actividades activas hasta 100% desde la lista.</span>
+              </label>
               <div className="space-y-1.5">
                 <label className="text-[11px] uppercase tracking-wide font-semibold text-slate-500">
                   Fecha límite

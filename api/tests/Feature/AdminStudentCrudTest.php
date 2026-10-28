@@ -96,7 +96,7 @@ class AdminStudentCrudTest extends TestCase
             'attendances' => ['section_id' => $sectionId, 'user_id' => $admin->id, 'date' => '2026-09-01', 'code' => 'P'],
             'observations' => ['user_id' => $admin->id, 'date' => '2026-09-01', 'type' => 'academic', 'description' => 'Seguimiento'],
             'alerts' => ['type' => 'performance', 'message' => 'Seguimiento', 'resolved' => true],
-            'student_promotions' => ['academic_year_id' => $yearId],
+            'promotion_decisions' => ['academic_year_id' => $yearId, 'status' => 'promoted', 'source' => 'legacy', 'placement_status' => null],
             'activity_scores' => $this->activityScore($sectionId, $subjectId, $periodId),
         };
         $recordId = DB::table($table)->insertGetId(['student_id' => $student->id, ...$fields]);
@@ -112,7 +112,7 @@ class AdminStudentCrudTest extends TestCase
     {
         return array_combine($tables = [
             'student_enrollments', 'activity_scores', 'period_grades', 'final_grades',
-            'attendances', 'observations', 'alerts', 'student_promotions',
+            'attendances', 'observations', 'alerts', 'promotion_decisions',
         ], array_map(fn ($table) => [$table], $tables));
     }
 

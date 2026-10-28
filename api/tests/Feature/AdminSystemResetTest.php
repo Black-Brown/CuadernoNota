@@ -299,8 +299,7 @@ class AdminSystemResetTest extends TestCase
         DB::table('attendances')->insert(['student_id' => 1, 'section_id' => 1, 'user_id' => $teacher->id, 'date' => '2026-08-01', 'code' => 'P']);
         DB::table('observations')->insert(['student_id' => 1, 'section_id' => 1, 'subject_id' => 1, 'period_id' => 1, 'user_id' => $teacher->id, 'date' => '2026-08-01', 'type' => 'academic', 'description' => 'Test']);
         DB::table('alerts')->insert(['student_id' => 1, 'type' => 'performance', 'message' => 'Test', 'resolved_by' => $admin->id]);
-        DB::table('student_promotions')->insert(['student_id' => 1, 'academic_year_id' => 1]);
-        DB::table('promotion_decisions')->insert(['student_enrollment_id' => 1, 'status' => 'promoted', 'destination_section_id' => 2, 'decided_by' => $admin->id]);
+        DB::table('promotion_decisions')->insert(['student_id' => 1, 'academic_year_id' => 1, 'student_enrollment_id' => 1, 'status' => 'promoted', 'destination_section_id' => 2, 'decided_by' => $admin->id]);
         DB::table('grade_review_actions')->insert(['period_id' => 1, 'subject_id' => 1, 'section_id' => 1, 'action' => 'approved', 'performed_by' => $admin->id]);
         DB::table('legacy_activities_unresolved')->insert(['legacy_activity_id' => 99, 'payload' => '{}', 'reason' => 'Unresolved historical data']);
         DB::table('audit_logs')->insert(['user_id' => $admin->id, 'action' => 'post', 'affected_table' => 'students', 'record_id' => 1, 'detail' => '{"historical":true}']);
