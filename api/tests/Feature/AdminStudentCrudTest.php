@@ -14,6 +14,106 @@ class AdminStudentCrudTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_admin_can_bulk_delete_students_without_history(): void
+    {
+        $this->admin();
+        $first = $this->student();
+        $second = $this->student(['enrollment_no' => 'DELETE-2', 'active' => false]);
+        $payload = ['student_ids' => [$first->id, $second->id], 'confirmation' => 'ELIMINAR'];
+        $this->postJson('/api/admin/students/bulk-delete', [...$payload, 'confirmation' => ''])->assertUnprocessable();
+        $this->postJson('/api/admin/students/bulk-delete', $payload)->assertOk();
+        $this->assertDatabaseMissing('students', ['id' => $first->id]);
+        $this->assertDatabaseMissing('students', ['id' => $second->id]);
+        $this->assertSame(2, DB::table('audit_logs')->where('action', 'student_delete')->count());
+    }
+
+    public function test_bulk_delete_preserves_entire_batch_if_any_student_has_history(): void
+    {
+        $this->admin();
+        [, $section] = $this->catalog();
+        $first = $this->student();
+        $second = $this->student(['enrollment_no' => 'HISTORY']);
+        DB::table('student_enrollments')->insert(['student_id' => $second->id, 'section_id' => $section, 'enrolled_at' => '2026-01-01', 'status' => 'withdrawn']);
+        $payload = ['student_ids' => [$first->id, $second->id], 'confirmation' => 'ELIMINAR'];
+        $this->postJson('/api/admin/students/bulk-delete', $payload)->assertUnprocessable()->assertJsonValidationErrors('student_ids');
+        $this->assertDatabaseHas('students', ['id' => $first->id]);
+        $this->assertDatabaseHas('students', ['id' => $second->id]);
+        $this->assertDatabaseCount('audit_logs', 0);
+        foreach (['teacher', 'coordinator'] as $role) {
+            Sanctum::actingAs(User::factory()->create(['role' => $role, 'active' => true]));
+            $this->postJson('/api/admin/students/bulk-delete', $payload)->assertForbidden();
+        }
+    }
+
+    public function test_admin_can_withdraw_multiple_students_and_preserve_their_status(): void
+    {
+        $this->admin();
+        [$year, $section] = $this->catalog();
+        $ids = [];
+        foreach ([true, false] as $index => $active) {
+            $student = $this->student(['enrollment_no' => 'BULK-'.$index, 'section_id' => $section, 'academic_year_id' => $year, 'active' => $active]);
+            $ids[] = $student->id;
+            DB::table('student_enrollments')->insert(['student_id' => $student->id, 'section_id' => $section, 'enrolled_at' => '2026-01-01', 'status' => 'active']);
+        }
+        $this->postJson('/api/admin/students/bulk-withdraw', ['student_ids' => $ids, 'section_id' => $section, 'reason' => 'Reorganización'])->assertOk();
+        foreach ($ids as $index => $id) {
+            $this->assertDatabaseHas('students', ['id' => $id, 'section_id' => null, 'active' => $index === 0]);
+            $this->assertDatabaseHas('student_enrollments', ['student_id' => $id, 'status' => 'withdrawn']);
+            $this->assertDatabaseHas('audit_logs', ['record_id' => $id, 'action' => 'student_withdraw']);
+        }
+    }
+
+    public function test_bulk_withdraw_is_atomic_and_restricted_to_admin(): void
+    {
+        $this->admin();
+        [$year, $section] = $this->catalog();
+        $first = $this->student(['section_id' => $section, 'academic_year_id' => $year]);
+        $second = $this->student(['enrollment_no' => 'OTHER']);
+        DB::table('student_enrollments')->insert(['student_id' => $first->id, 'section_id' => $section, 'enrolled_at' => '2026-01-01', 'status' => 'active']);
+        $payload = ['student_ids' => [$first->id, $second->id], 'section_id' => $section, 'reason' => 'Reorganización'];
+        $this->postJson('/api/admin/students/bulk-withdraw', $payload)->assertUnprocessable();
+        $this->assertDatabaseHas('students', ['id' => $first->id, 'section_id' => $section]);
+        $this->assertDatabaseHas('student_enrollments', ['student_id' => $first->id, 'status' => 'active']);
+        $this->assertDatabaseCount('audit_logs', 0);
+        foreach (['teacher', 'coordinator'] as $role) {
+            Sanctum::actingAs(User::factory()->create(['role' => $role, 'active' => true]));
+            $this->postJson('/api/admin/students/bulk-withdraw', $payload)->assertForbidden();
+        }
+    }
+
+    public function test_withdraw_preserves_history_and_returns_active_student_to_placement(): void
+    {
+        $this->travelTo(now()->setDate(2026, 11, 7));
+        $this->admin();
+        [$year, $section, $subject, $period] = $this->catalog();
+        $student = $this->student(['section_id' => $section, 'academic_year_id' => $year]);
+        $enrollment = DB::table('student_enrollments')->insertGetId(['student_id' => $student->id, 'section_id' => $section, 'enrolled_at' => '2026-09-01', 'status' => 'active']);
+        DB::table('period_grades')->insert(['student_id' => $student->id, 'section_id' => $section, 'subject_id' => $subject, 'period_id' => $period, 'period_score' => 85, 'status' => 'official']);
+        $url = "/api/admin/students/{$student->id}/withdraw";
+        $this->postJson($url, ['section_id' => $section, 'reason' => 'Cambio de sección'])->assertOk();
+        $this->assertDatabaseHas('students', ['id' => $student->id, 'active' => true, 'section_id' => null, 'academic_year_id' => null]);
+        $this->assertDatabaseHas('student_enrollments', ['id' => $enrollment, 'status' => 'withdrawn']);
+        $this->assertSame('2026-11-07', substr((string) DB::table('student_enrollments')->where('id', $enrollment)->value('ended_at'), 0, 10));
+        $this->assertDatabaseHas('period_grades', ['student_id' => $student->id, 'section_id' => $section, 'period_score' => 85, 'status' => 'official']);
+        $this->getJson('/api/admin/student-placements/pending')->assertOk()->assertJsonFragment(['id' => $student->id]);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'student_withdraw', 'record_id' => $student->id]);
+        $this->postJson($url, ['section_id' => $section, 'reason' => 'Reintento'])->assertUnprocessable();
+    }
+
+    public function test_only_admin_can_withdraw_and_reason_is_required(): void
+    {
+        $this->admin();
+        [$year, $section] = $this->catalog();
+        $student = $this->student(['section_id' => $section, 'academic_year_id' => $year]);
+        $url = "/api/admin/students/{$student->id}/withdraw";
+        $this->postJson($url, ['section_id' => $section])->assertUnprocessable();
+        foreach (['teacher', 'coordinator'] as $role) {
+            Sanctum::actingAs(User::factory()->create(['role' => $role, 'active' => true]));
+            $this->postJson($url, ['section_id' => $section, 'reason' => 'Retiro'])->assertForbidden();
+        }
+        $this->assertDatabaseHas('students', ['id' => $student->id, 'section_id' => $section]);
+    }
+
     public function test_admin_can_edit_identity_without_changing_placement_status_or_history(): void
     {
         $admin = $this->admin();

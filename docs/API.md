@@ -392,6 +392,9 @@ Cuerpo de creación:
 | `POST` | `/admin/students/{student}/enrollments` | Inscribe o cambia al estudiante de sección. |
 | `POST` | `/admin/students/{student}/deactivate` | Da de baja conservando historial. |
 | `POST` | `/admin/students/{student}/reactivate` | Reactiva y deja pendiente de sección. |
+| `POST` | `/admin/students/{student}/withdraw` | Retira de la sección actual conservando estado e historial. Requiere `section_id` actual y `reason` (máximo 200 caracteres). Cierra matrículas activas y limpia sección/año actuales; registra auditoría. Solo administrador. |
+| `POST` | `/admin/students/bulk-delete` | Eliminación definitiva exclusiva del administrador. Requiere `student_ids` (1–1000 IDs distintos) y `confirmation: ELIMINAR`. Rechaza todo el lote si algún expediente tiene sección o historial académico; identifica las matrículas bloqueadas. Registra auditoría por estudiante eliminado. |
+| `POST` | `/admin/students/bulk-withdraw` | Retiro masivo exclusivo del administrador. Requiere `student_ids` (1–1000 IDs distintos), `section_id` y `reason` (máximo 200 caracteres). Conserva estado, notas e historial; registra auditoría por estudiante. Operación atómica: si alguno no pertenece a la sección o tiene matrícula incoherente, no se retira ninguno. |
 
 Filtros de `GET /admin/students`:
 

@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAdminStudents, getStudentWorkspaces } from '../../api/admin.api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { bulkWithdrawStudents, getAdminStudents, getStudentWorkspaces } from '../../api/admin.api';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { getErrorMessage } from '../../utils/apiError';
 import useToast from '../../hooks/useToast';
 import PageHeader from '../../components/ui/PageHeader';
 import FilterBar from '../../components/ui/FilterBar';
@@ -9,8 +11,9 @@ import SearchInput from '../../components/ui/SearchInput';
 import DataTable from '../../components/ui/DataTable';
 import StatusBadge from '../../components/ui/StatusBadge';
 import StudentActions from '../../components/admin/StudentActions';
+import StudentBulkDelete from '../../components/admin/StudentBulkDelete';
 import StudentBulkReplaceDrawer from '../../components/admin/StudentBulkReplaceDrawer';
-import { selectClass } from '../../components/ui/FormField';
+import FormField, { inputClass, selectClass } from '../../components/ui/FormField';
 import Toast from '../../components/ui/Toast';
 
 export default function StudentWorkspace() {
@@ -25,6 +28,25 @@ export default function StudentWorkspace() {
   const [active, setActive] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [withdrawIds, setWithdrawIds] = useState([]);
+  const [withdrawReason, setWithdrawReason] = useState('');
+  const withdraw = useMutation({
+    mutationFn: bulkWithdrawStudents,
+    onSuccess: (result) => {
+      setWithdrawIds([]);
+      setSelectedIds([]);
+      qc.invalidateQueries({ predicate: (query) => [
+        'admin-students', 'admin-student', 'admin-student-placements', 'admin-dashboard',
+        'admin-sections', 'admin-promotion-candidates', 'admin-student-workspaces', 'courses', 'attendance',
+      ].includes(query.queryKey[0]) });
+      showToast(result.message);
+    },
+  });
+
+  useEffect(() => {
+    setSelectedIds([]);
+    setWithdrawIds([]);
+  }, [workspaceId, yearId]);
 
   const workspaceParams = yearId ? { academic_year_id: yearId } : {};
   const { data: workspaceData } = useQuery({
@@ -95,12 +117,17 @@ export default function StudentWorkspace() {
       </select>
     </FilterBar>
 
-    {students.length > 0 && <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+    {students.length > 0 && <div className="sticky top-0 z-20 mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p className="text-sm font-extrabold text-slate-900">Acciones por lote</p>
         <p className="mt-1 text-xs text-slate-500">{selectedIds.length} de {students.length} estudiantes visibles seleccionados.</p>
+        {!pending && selectedIds.length > 0 && <p className="mt-1 text-xs font-bold text-indigo-600">Usa «Quitar seleccionados del curso» para retirar todo el grupo marcado.</p>}
       </div>
       <div className="flex flex-wrap gap-2">
+        <StudentBulkDelete students={selectedStudents} onDeleted={(result) => { setSelectedIds([]); showToast(result.message); }} />
+        {!pending && <button type="button" disabled={!selectedIds.length} onClick={() => { withdraw.reset(); setWithdrawReason(''); setWithdrawIds([...selectedIds]); }} className="flex items-center gap-2 rounded-lg bg-slate-950 px-3 py-2.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-40">
+          <span aria-hidden="true" className="material-symbols-outlined text-[17px]">group_remove</span> Quitar seleccionados del curso ({selectedIds.length})
+        </button>}
         <button type="button" onClick={toggleAll} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">{allVisibleSelected ? 'Limpiar selección' : 'Seleccionar visibles'}</button>
         <button type="button" disabled={!selectedIds.length} onClick={() => setBulkOpen(true)} className="flex items-center gap-2 rounded-lg bg-slate-950 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-40">
           <span aria-hidden="true" className="material-symbols-outlined text-[17px]">find_replace</span> Buscar y reemplazar matrículas
@@ -120,7 +147,7 @@ export default function StudentWorkspace() {
         { key: 'student', label: 'Estudiante', render: (student) => <div><p className="font-extrabold text-slate-900">{student.name} {student.last_name}</p><p className="mt-1 text-xs text-slate-500">{student.section ? `${student.section.grade?.name} · Sección ${student.section.name}` : 'Sin sección actual'}</p></div> },
         { key: 'year', label: 'Año escolar', render: (student) => student.section?.academic_year?.name || '—' },
         { key: 'active', label: 'Estado', align: 'center', render: (student) => <StatusBadge tone={!student.active ? 'neutral' : student.section ? 'success' : 'warning'} label={!student.active ? 'Inactivo' : student.section ? 'Inscrito' : 'Pendiente'} /> },
-        { key: 'actions', label: 'Acciones', align: 'right', render: (student) => <StudentActions student={student} onSuccess={showToast} /> },
+        { key: 'actions', label: 'Acciones', align: 'right', render: (student) => <StudentActions student={student} hideWithdraw={selectedIds.length > 0} onSuccess={showToast} /> },
       ]}
     />
 
@@ -137,6 +164,16 @@ export default function StudentWorkspace() {
         showToast(result.message);
       }}
     />
+    <ConfirmDialog open={withdrawIds.length > 0} onClose={() => { if (!withdraw.isPending) setWithdrawIds([]); }}
+      title={`Quitar ${withdrawIds.length} estudiantes del curso`}
+      message={`Se retirarán de ${title}. Sus notas, asistencia e historial se conservarán. Los estudiantes activos quedarán pendientes de asignación.`}
+      confirmLabel="Quitar seleccionados" loading={withdraw.isPending} disableConfirm={!withdrawReason.trim()}
+      onConfirm={() => withdraw.mutate({ student_ids: withdrawIds, section_id: Number(workspaceId), reason: withdrawReason.trim() })}>
+      {withdraw.isError && <p role="alert" className="mb-3 text-sm text-red-600">{getErrorMessage(withdraw.error)}</p>}
+      <FormField htmlFor="bulk-withdraw-reason" label="Motivo del retiro" required>
+        <textarea id="bulk-withdraw-reason" autoFocus rows={3} maxLength={200} disabled={withdraw.isPending} className={inputClass} value={withdrawReason} onChange={(event) => setWithdrawReason(event.target.value)} />
+      </FormField>
+    </ConfirmDialog>
     <Toast toast={toast} />
   </>;
 }
