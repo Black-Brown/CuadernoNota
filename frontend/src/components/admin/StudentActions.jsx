@@ -1,7 +1,7 @@
 import React, { useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { deactivateStudent, deleteAdminStudent, reactivateStudent, updateAdminStudent } from '../../api/admin.api';
+import { deactivateStudent, deleteAdminStudent, reactivateStudent, updateAdminStudent, withdrawStudent } from '../../api/admin.api';
 import { getErrorMessage } from '../../utils/apiError';
 import SideDrawer from '../ui/SideDrawer';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -12,7 +12,7 @@ const STUDENT_QUERY_KEYS = [
   'admin-sections', 'admin-promotion-candidates', 'admin-student-workspaces', 'courses', 'attendance',
 ];
 
-export default function StudentActions({ student, showLabels = false, onSuccess, onDeleted }) {
+export default function StudentActions({ student, showLabels = false, onSuccess, onDeleted, hideWithdraw = false }) {
   const qc = useQueryClient();
   const formId = useId();
   const [action, setAction] = useState(null);
@@ -26,6 +26,7 @@ export default function StudentActions({ student, showLabels = false, onSuccess,
       if (requestedAction === 'edit') return updateAdminStudent(student.id, payload);
       if (requestedAction === 'deactivate') return deactivateStudent(student.id, { reason: payload });
       if (requestedAction === 'reactivate') return reactivateStudent(student.id);
+      if (requestedAction === 'withdraw') return withdrawStudent(student.id, { section_id: student.section_id ?? student.section?.id, reason: payload });
       return deleteAdminStudent(student.id, payload);
     },
     onSuccess: (result, variables) => {
@@ -54,6 +55,7 @@ export default function StudentActions({ student, showLabels = false, onSuccess,
 
   const actions = [
     { key: 'edit', label: 'Editar', icon: 'edit', color: 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-600' },
+    ...(!hideWithdraw && (student.section_id || student.section?.id) ? [{ key: 'withdraw', label: 'Quitar del curso', icon: 'group_remove', color: 'text-slate-600 hover:bg-amber-50 hover:text-amber-700' }] : []),
     student.active
       ? { key: 'deactivate', label: 'Desactivar', icon: 'person_off', color: 'text-slate-600 hover:bg-amber-50 hover:text-amber-700' }
       : { key: 'reactivate', label: 'Reactivar', icon: 'person_add', color: 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' },
@@ -78,6 +80,16 @@ export default function StudentActions({ student, showLabels = false, onSuccess,
       </div>
 
       {action && createPortal(<>
+        <ConfirmDialog open={action === 'withdraw'} onClose={close}
+          onConfirm={() => { setError(''); mutation.mutate({ action: 'withdraw', payload: reason.trim() }); }}
+          loading={mutation.isPending} disableConfirm={!reason.trim()} title="Quitar estudiante del curso"
+          message={`Se retirará a ${fullName} de su sección actual. Su expediente, notas y asistencia se conservarán. Si está activo, aparecerá en Asignar estudiantes para colocarlo en otra sección.`}
+          confirmLabel="Quitar del curso">
+          {errorNotice}
+          <FormField htmlFor={`${formId}-withdraw-reason`} label="Motivo del retiro" required>
+            <textarea id={`${formId}-withdraw-reason`} autoFocus rows={3} maxLength={200} disabled={mutation.isPending} className={inputClass} value={reason} onChange={event => setReason(event.target.value)} />
+          </FormField>
+        </ConfirmDialog>
         <SideDrawer
           open={action === 'edit'}
           onClose={close}

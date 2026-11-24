@@ -5,6 +5,7 @@ namespace App\Infrastructure\Http\Controllers\Admin;
 use App\Application\Student\BulkReplaceStudentEnrollmentNumbers;
 use App\Application\Student\ImportStudentsFromCsv;
 use App\Infrastructure\Models\AcademicYear;
+use App\Infrastructure\Models\AuditLog;
 use App\Infrastructure\Models\Section;
 use App\Infrastructure\Models\Student;
 use App\Infrastructure\Models\StudentEnrollment;
@@ -197,15 +198,7 @@ class StudentController extends Controller
             }
 
             // Never cascade-delete an academic record, including historical enrollments.
-            $hasHistory = $student->section_id !== null
-                || $student->enrollments()->exists()
-                || $student->activityScores()->exists()
-                || $student->periodGrades()->exists()
-                || $student->finalGrades()->exists()
-                || $student->attendances()->exists()
-                || $student->observations()->exists()
-                || $student->alerts()->exists()
-                || DB::table('promotion_decisions')->where('student_id', $student->id)->exists();
+            $hasHistory = $this->hasAcademicHistory($student);
 
             if ($hasHistory) {
                 throw ValidationException::withMessages([
@@ -217,6 +210,46 @@ class StudentController extends Controller
         });
 
         return response()->json(['message' => 'Estudiante eliminado definitivamente.']);
+    }
+
+    private function hasAcademicHistory(Student $student): bool
+    {
+        return $student->section_id !== null
+                || $student->enrollments()->exists()
+                || $student->activityScores()->exists()
+                || $student->periodGrades()->exists()
+                || $student->finalGrades()->exists()
+                || $student->attendances()->exists()
+                || $student->observations()->exists()
+                || $student->alerts()->exists()
+                || DB::table('promotion_decisions')->where('student_id', $student->id)->exists();
+
+    }
+
+    public function bulkDestroy(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'student_ids' => ['required', 'array', 'min:1', 'max:1000'],
+            'student_ids.*' => ['required', 'integer', 'distinct', 'exists:students,id'],
+            'confirmation' => ['required', 'in:ELIMINAR'],
+        ]);
+        DB::transaction(function () use ($data, $request): void {
+            $students = Student::whereIn('id', $data['student_ids'])->orderBy('id')->lockForUpdate()->get();
+            if ($students->count() !== count($data['student_ids'])) {
+                throw ValidationException::withMessages(['student_ids' => 'El listado cambió. Actualízalo antes de continuar.']);
+            }
+            $blocked = $students->filter(fn ($student) => $this->hasAcademicHistory($student));
+            if ($blocked->isNotEmpty()) {
+                throw ValidationException::withMessages(['student_ids' => 'No se eliminó ningún estudiante. Tienen sección o historial académico: '.$blocked->pluck('enrollment_no')->implode(', ').'. Desmárcalos para continuar.']);
+            }
+            foreach ($students as $student) {
+                AuditLog::create(['user_id' => $request->user()->id, 'action' => 'student_delete',
+                    'affected_table' => 'students', 'record_id' => $student->id,
+                    'detail' => ['enrollment_no' => $student->enrollment_no], 'ip' => $request->ip()]);
+                $student->delete();
+            }
+        });
+        return response()->json(['message' => count($data['student_ids']).' estudiantes eliminados definitivamente.']);
     }
 
     public function enroll(Request $request, Student $student): JsonResponse
@@ -248,6 +281,56 @@ class StudentController extends Controller
         });
 
         return response()->json(['message' => 'Estudiante dado de baja; su historial fue conservado.']);
+    }
+
+    public function bulkWithdraw(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'student_ids' => ['required', 'array', 'min:1', 'max:1000'],
+            'student_ids.*' => ['required', 'integer', 'distinct', 'exists:students,id'],
+            'section_id' => ['required', 'integer', 'exists:sections,id'],
+            'reason' => ['required', 'string', 'max:200'],
+        ]);
+        DB::transaction(function () use ($request, $data): void {
+            $students = Student::whereIn('id', $data['student_ids'])->orderBy('id')->lockForUpdate()->get();
+            if ($students->count() !== count($data['student_ids'])) {
+                throw ValidationException::withMessages(['student_ids' => 'El listado cambió. Actualiza los estudiantes antes de continuar.']);
+            }
+            foreach ($students as $student) {
+                $this->withdraw($request, $student);
+            }
+        });
+        return response()->json(['message' => count($data['student_ids']).' estudiantes retirados del curso. Su historial se conservó.']);
+    }
+
+    public function withdraw(Request $request, Student $student): JsonResponse
+    {
+        $data = $request->validate([
+            'section_id' => ['required', 'integer', 'exists:sections,id'],
+            'reason' => ['required', 'string', 'max:200'],
+        ]);
+        DB::transaction(function () use ($student, $data, $request): void {
+            $student = Student::query()->lockForUpdate()->findOrFail($student->id);
+            if ((int) $student->section_id !== (int) $data['section_id']) {
+                throw ValidationException::withMessages(['section_id' => 'La sección del estudiante cambió. Actualiza el listado antes de continuar.']);
+            }
+            $enrollments = StudentEnrollment::where('student_id', $student->id)->where('status', 'active')->lockForUpdate()->get();
+            if ($enrollments->contains(fn ($enrollment) => (int) $enrollment->section_id !== (int) $data['section_id'])) {
+                throw ValidationException::withMessages(['student' => 'El estudiante tiene otra matrícula activa. Revisa su historial antes de retirarlo.']);
+            }
+            $date = now()->toDateString();
+            if ($enrollments->contains(fn ($enrollment) => substr((string) $enrollment->getRawOriginal('enrolled_at'), 0, 10) > $date)) {
+                throw ValidationException::withMessages(['student' => 'La fecha de inscripción es posterior a hoy. Revisa la matrícula antes de retirarlo.']);
+            }
+            foreach ($enrollments as $enrollment) {
+                $enrollment->update(['status' => 'withdrawn', 'ended_at' => $date, 'end_reason' => $data['reason']]);
+            }
+            $student->update(['section_id' => null, 'academic_year_id' => null]);
+            AuditLog::create(['user_id' => $request->user()->id, 'action' => 'student_withdraw',
+                'affected_table' => 'students', 'record_id' => $student->id,
+                'detail' => ['section_id' => $data['section_id'], 'reason' => $data['reason']], 'ip' => $request->ip()]);
+        });
+        return response()->json(['message' => 'Estudiante retirado del curso. Su historial se conservó y puede asignarse a otra sección.']);
     }
 
     public function reactivate(Student $student): JsonResponse

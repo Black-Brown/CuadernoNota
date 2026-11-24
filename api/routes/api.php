@@ -81,6 +81,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/students/{student}/enrollments', [AdminStudentController::class, 'enroll'])->name('students.enroll');
             Route::post('/students/{student}/deactivate', [AdminStudentController::class, 'deactivate'])->name('students.deactivate');
             Route::post('/students/{student}/reactivate', [AdminStudentController::class, 'reactivate'])->name('students.reactivate');
+            Route::post('/students/bulk-withdraw', [AdminStudentController::class, 'bulkWithdraw'])->name('students.bulk-withdraw');
+            Route::post('/students/bulk-delete', [AdminStudentController::class, 'bulkDestroy'])->name('students.bulk-delete');
+            Route::post('/students/{student}/withdraw', [AdminStudentController::class, 'withdraw'])->name('students.withdraw');
 
             Route::get('/grade-reviews', [GradeReviewController::class, 'index'])->name('grade-reviews.index');
             Route::get('/grade-reviews/{sectionId}/{subjectId}/{periodId}', [GradeReviewController::class, 'show'])->name('grade-reviews.show');
